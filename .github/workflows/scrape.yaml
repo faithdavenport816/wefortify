@@ -1,0 +1,44 @@
+name: ReliaTrax Daily Export
+
+on:
+  schedule:
+    # Runs daily at 9 AM UTC (adjust timezone as needed)
+    - cron: '0 9 * * *'
+  workflow_dispatch:  # Allows manual triggering from GitHub UI
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Chrome
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+    
+    - name: Install Python dependencies
+      run: |
+        pip install -r requirements.txt
+    
+    - name: Run ReliaTrax scraper
+      env:
+        RELIATRAX_USERNAME: ${{ secrets.RELIATRAX_USERNAME }}
+        RELIATRAX_PASSWORD: ${{ secrets.RELIATRAX_PASSWORD }}
+        GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
+        SHEET_ID: ${{ secrets.SHEET_ID }}
+      run: python scraper.py
+    
+    - name: Upload screenshots on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: debug-screenshots
+        path: /tmp/*.png
