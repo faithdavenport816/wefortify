@@ -1,7 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 import gspread
@@ -106,6 +106,16 @@ def export_treatment_data(driver):
         print("Waiting for export page to load...")
         time.sleep(2)
 
+        # Select "All Folders" from the dropdown
+        print("Looking for folder dropdown...")
+        folder_dropdown = wait.until(EC.presence_of_element_located((By.ID, "folderID")))
+        print("Found folder dropdown, selecting 'All Folders'...")
+
+        select = Select(folder_dropdown)
+        select.select_by_value("1")  # Value "1" corresponds to "All Folders"
+        print("Selected 'All Folders'")
+        time.sleep(1)
+
         # Find the CSV Row View button
         print("Looking for CSV Row View button...")
         csv_button = wait.until(EC.presence_of_element_located((By.ID, "btCsvRowDownload")))
@@ -137,7 +147,7 @@ def export_treatment_data(driver):
         max_wait = 30  # Maximum wait time in seconds
         downloaded_file = None
 
-        for i in range(max_wait):
+        for _ in range(max_wait):
             time.sleep(1)
             # Look for CSV files in download directory
             csv_files = [f for f in os.listdir(download_dir) if f.endswith('.csv')]
