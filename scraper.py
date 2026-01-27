@@ -56,8 +56,6 @@ def login_to_reliatrax(driver, username, password):
         print("Waiting for page to load...")
         time.sleep(2)
 
-        # Save page source for debugging
-        page_source = driver.page_source
         print(f"Page title: {driver.title}")
         print(f"Current URL: {driver.current_url}")
 
@@ -77,9 +75,33 @@ def login_to_reliatrax(driver, username, password):
         password_field.send_keys(password)
         print("Password entered successfully")
 
-        # Click login button
+        # Click login button - try multiple selectors
         print("Looking for login button...")
-        login_button = driver.find_element(By.CSS_SELECTOR, "input[type='submit']")
+        login_button = None
+        login_button_selectors = [
+            (By.CSS_SELECTOR, "input[type='submit']"),
+            (By.CSS_SELECTOR, "button[type='submit']"),
+            (By.ID, "btnLogin"),
+            (By.NAME, "btnLogin"),
+            (By.XPATH, "//button[contains(text(), 'Login') or contains(text(), 'Sign In') or contains(text(), 'Log In')]"),
+            (By.XPATH, "//input[@type='button' and contains(@value, 'Login')]"),
+        ]
+
+        for selector_type, selector_value in login_button_selectors:
+            try:
+                login_button = driver.find_element(selector_type, selector_value)
+                print(f"Found login button with: {selector_type} = {selector_value}")
+                break
+            except:
+                continue
+
+        if not login_button:
+            print("Could not find login button with any selector!")
+            driver.save_screenshot("/tmp/login_button_error.png")
+            with open("/tmp/login_button_page_source.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            raise Exception("Login button not found")
+
         login_button.click()
         print("Login button clicked")
 
