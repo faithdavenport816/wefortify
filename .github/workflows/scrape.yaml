@@ -36,22 +36,12 @@ jobs:
         SHEET_ID: ${{ secrets.SHEET_ID }}
       run: python scraper.py
 
-    - name: Create summary with Google Sheets link
+    - name: List all accessible Google Sheets
       if: success()
-      run: |
-        # Read the reversed sheet ID and reverse it back
-        REVERSED_ID=$(cat /tmp/sheet_url.txt)
-        SHEET_ID=$(echo $REVERSED_ID | rev)
-        FULL_URL="https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit"
-
-        echo "## ✅ Export Completed Successfully!" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "📊 **[Click here to view your Google Sheet](${FULL_URL})**" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Or copy this link:" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "${FULL_URL}" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+      env:
+        GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
+        SHEET_ID: ${{ secrets.SHEET_ID }}
+      run: python find_sheet.py
 
     - name: Upload debug files on failure
       if: failure()
