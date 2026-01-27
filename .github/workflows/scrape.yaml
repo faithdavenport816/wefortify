@@ -36,9 +36,11 @@ jobs:
         SHEET_ID: ${{ secrets.SHEET_ID }}
       run: python scraper.py
     
-    - name: Upload screenshots on failure
+    - name: Upload debug files on failure
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: debug-screenshots
-        path: /tmp/*.png
+        name: debug-files
+        path: |
+          /tmp/*.png
+          /tmp/*.html
