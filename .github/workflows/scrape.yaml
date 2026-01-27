@@ -35,7 +35,16 @@ jobs:
         GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
         SHEET_ID: ${{ secrets.SHEET_ID }}
       run: python scraper.py
-    
+
+    - name: Create summary with Google Sheets link
+      if: success()
+      run: |
+        echo "## ✅ Export Completed Successfully!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📊 [View your Google Sheet](https://docs.google.com/spreadsheets/d/${{ secrets.SHEET_ID }}/edit)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Direct link: \`https://docs.google.com/spreadsheets/d/${{ secrets.SHEET_ID }}/edit\`" >> $GITHUB_STEP_SUMMARY
+
     - name: Upload debug files on failure
       if: failure()
       uses: actions/upload-artifact@v4
