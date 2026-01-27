@@ -224,25 +224,30 @@ def write_to_sheets(data):
     
     # Check if sheet is empty (first run)
     existing_data = sheet.get_all_values()
-    
-    if not existing_data:
-        # First run - add headers
-        print("First run detected. Adding headers...")
-        if data["headers"]:
-            sheet.append_row(data["headers"])
-    
-    # Add timestamp column if not present
-    headers = data["headers"]
+
+    # Add timestamp column to headers
+    headers = data["headers"].copy()
     if "Export Timestamp" not in headers:
         headers.append("Export Timestamp")
-    
-    # Append all rows with timestamp
+
+    # Prepare all rows with timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+    rows_with_timestamp = []
+
     for row in data["rows"]:
         row_with_timestamp = row + [timestamp]
-        sheet.append_row(row_with_timestamp)
-    
+        rows_with_timestamp.append(row_with_timestamp)
+
+    if not existing_data:
+        # First run - add headers and all data in one batch
+        print("First run detected. Adding headers and data...")
+        all_data = [headers] + rows_with_timestamp
+        sheet.update('A1', all_data)
+    else:
+        # Append all rows in one batch operation
+        print(f"Appending {len(rows_with_timestamp)} rows in batch...")
+        sheet.append_rows(rows_with_timestamp, value_input_option='USER_ENTERED')
+
     print(f"Successfully wrote {len(data['rows'])} rows to Google Sheet!")
 
 def main():
