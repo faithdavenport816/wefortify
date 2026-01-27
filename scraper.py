@@ -251,6 +251,11 @@ def write_to_sheets(data):
 
     print(f"Successfully wrote {len(data['rows'])} rows to Google Sheet!")
 
+    # Save sheet ID to a file for the workflow to display
+    # Reverse the ID to avoid GitHub Actions masking
+    with open("/tmp/sheet_url.txt", "w") as f:
+        f.write(sheet_id[::-1])
+
 def main():
     driver = None
     

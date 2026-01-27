@@ -39,11 +39,19 @@ jobs:
     - name: Create summary with Google Sheets link
       if: success()
       run: |
+        # Read the reversed sheet ID and reverse it back
+        REVERSED_ID=$(cat /tmp/sheet_url.txt)
+        SHEET_ID=$(echo $REVERSED_ID | rev)
+        FULL_URL="https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit"
+
         echo "## ✅ Export Completed Successfully!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "📊 [View your Google Sheet](https://docs.google.com/spreadsheets/d/${{ secrets.SHEET_ID }}/edit)" >> $GITHUB_STEP_SUMMARY
+        echo "📊 **[Click here to view your Google Sheet](${FULL_URL})**" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Direct link: \`https://docs.google.com/spreadsheets/d/${{ secrets.SHEET_ID }}/edit\`" >> $GITHUB_STEP_SUMMARY
+        echo "Or copy this link:" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "${FULL_URL}" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload debug files on failure
       if: failure()
