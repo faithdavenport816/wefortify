@@ -15,12 +15,17 @@ from datetime import datetime
 def setup_driver():
     """Set up headless Chrome driver for GitHub Actions"""
     chrome_options = Options()
-    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--headless=new')  # Use new headless mode
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--window-size=1920,1080')
-    
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+
+    # Enable JavaScript
+    chrome_options.add_argument('--enable-javascript')
+
     # Set download directory
     prefs = {
         "download.default_directory": "/tmp",
@@ -28,42 +33,128 @@ def setup_driver():
         "download.directory_upgrade": True,
     }
     chrome_options.add_experimental_option("prefs", prefs)
-    
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
+
     driver = webdriver.Chrome(options=chrome_options)
+
+    # Set page load timeout
+    driver.set_page_load_timeout(30)
+
     return driver
 
 def login_to_reliatrax(driver, username, password):
     """Log into ReliaTrax"""
     print("Navigating to login page...")
     driver.get("https://wefortify.reliatrax.net/Account.aspx/Login")
-    
+
     try:
         # Wait for login form to load
-        wait = WebDriverWait(driver, 15)
-        
-        # Find and fill username field (adjust selectors based on actual page)
-        username_field = wait.until(
-            EC.presence_of_element_located((By.ID, "txtUsername"))
-        )
+        wait = WebDriverWait(driver, 20)
+
+        # Wait for page to be fully loaded
+        print("Waiting for page to load...")
+        time.sleep(2)
+
+        # Save page source for debugging
+        page_source = driver.page_source
+        print(f"Page title: {driver.title}")
+        print(f"Current URL: {driver.current_url}")
+
+        # Try multiple selectors for username field
+        username_field = None
+        username_selectors = [
+            (By.ID, "txtUsername"),
+            (By.NAME, "username"),
+            (By.NAME, "txtUsername"),
+            (By.CSS_SELECTOR, "input[type='text']"),
+            (By.CSS_SELECTOR, "input[name*='user' i]"),
+            (By.XPATH, "//input[@type='text']"),
+        ]
+
+        for selector_type, selector_value in username_selectors:
+            try:
+                print(f"Trying selector: {selector_type} = {selector_value}")
+                username_field = wait.until(
+                    EC.presence_of_element_located((selector_type, selector_value))
+                )
+                print(f"Found username field with: {selector_type} = {selector_value}")
+                break
+            except TimeoutException:
+                continue
+
+        if not username_field:
+            print("Could not find username field with any selector!")
+            print(f"Saving page source to /tmp/page_source.html")
+            with open("/tmp/page_source.html", "w", encoding="utf-8") as f:
+                f.write(page_source)
+            raise TimeoutException("Username field not found with any selector")
+
         username_field.clear()
         username_field.send_keys(username)
-        
+        print("Username entered successfully")
+
         # Find and fill password field
-        password_field = driver.find_element(By.ID, "txtPassword")
+        password_field = None
+        password_selectors = [
+            (By.ID, "txtPassword"),
+            (By.NAME, "password"),
+            (By.NAME, "txtPassword"),
+            (By.CSS_SELECTOR, "input[type='password']"),
+            (By.XPATH, "//input[@type='password']"),
+        ]
+
+        for selector_type, selector_value in password_selectors:
+            try:
+                password_field = driver.find_element(selector_type, selector_value)
+                print(f"Found password field with: {selector_type} = {selector_value}")
+                break
+            except:
+                continue
+
+        if not password_field:
+            raise TimeoutException("Password field not found")
+
         password_field.clear()
         password_field.send_keys(password)
-        
+        print("Password entered successfully")
+
         # Click login button
-        login_button = driver.find_element(By.ID, "btnLogin")
+        login_button = None
+        login_button_selectors = [
+            (By.ID, "btnLogin"),
+            (By.NAME, "btnLogin"),
+            (By.CSS_SELECTOR, "button[type='submit']"),
+            (By.CSS_SELECTOR, "input[type='submit']"),
+            (By.XPATH, "//button[contains(text(), 'Login') or contains(text(), 'Sign In')]"),
+            (By.XPATH, "//input[@type='submit']"),
+        ]
+
+        for selector_type, selector_value in login_button_selectors:
+            try:
+                login_button = driver.find_element(selector_type, selector_value)
+                print(f"Found login button with: {selector_type} = {selector_value}")
+                break
+            except:
+                continue
+
+        if not login_button:
+            raise TimeoutException("Login button not found")
+
         login_button.click()
-        
+        print("Login button clicked")
+
         # Wait for redirect after login
         time.sleep(3)
         print("Login successful!")
-        
-    except TimeoutException:
-        print("Login page elements not found. Saving screenshot for debugging...")
+
+    except TimeoutException as e:
+        print(f"Login failed with timeout: {e}")
+        print("Saving screenshot for debugging...")
         driver.save_screenshot("/tmp/login_error.png")
+        print("Saving page source for debugging...")
+        with open("/tmp/page_source.html", "w", encoding="utf-8") as f:
+            f.write(driver.page_source)
         raise
 
 def export_treatment_data(driver):
