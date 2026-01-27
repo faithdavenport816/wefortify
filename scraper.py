@@ -220,7 +220,12 @@ def write_to_sheets(data):
     
     # Open your sheet
     sheet_id = os.environ['SHEET_ID']
-    sheet = client.open_by_key(sheet_id).sheet1
+    spreadsheet = client.open_by_key(sheet_id)
+    sheet = spreadsheet.sheet1
+
+    # Print the Google Sheets URL
+    sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}"
+    print(f"Google Sheet URL: {sheet_url}")
     
     # Check if sheet is empty (first run)
     existing_data = sheet.get_all_values()
@@ -249,6 +254,7 @@ def write_to_sheets(data):
         sheet.append_rows(rows_with_timestamp, value_input_option='USER_ENTERED')
 
     print(f"Successfully wrote {len(data['rows'])} rows to Google Sheet!")
+    print(f"View your data at: {sheet_url}")
 
 def main():
     driver = None
