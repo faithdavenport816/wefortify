@@ -61,86 +61,25 @@ def login_to_reliatrax(driver, username, password):
         print(f"Page title: {driver.title}")
         print(f"Current URL: {driver.current_url}")
 
-        # Try multiple selectors for username field
-        username_field = None
-        username_selectors = [
-            (By.ID, "txtUsername"),
-            (By.NAME, "username"),
-            (By.NAME, "txtUsername"),
-            (By.CSS_SELECTOR, "input[type='text']"),
-            (By.CSS_SELECTOR, "input[name*='user' i]"),
-            (By.XPATH, "//input[@type='text']"),
-        ]
-
-        for selector_type, selector_value in username_selectors:
-            try:
-                print(f"Trying selector: {selector_type} = {selector_value}")
-                username_field = wait.until(
-                    EC.presence_of_element_located((selector_type, selector_value))
-                )
-                print(f"Found username field with: {selector_type} = {selector_value}")
-                break
-            except TimeoutException:
-                continue
-
-        if not username_field:
-            print("Could not find username field with any selector!")
-            print(f"Saving page source to /tmp/page_source.html")
-            with open("/tmp/page_source.html", "w", encoding="utf-8") as f:
-                f.write(page_source)
-            raise TimeoutException("Username field not found with any selector")
-
+        # Find and fill username field
+        print("Looking for username field...")
+        username_field = wait.until(
+            EC.presence_of_element_located((By.NAME, "username"))
+        )
         username_field.clear()
         username_field.send_keys(username)
         print("Username entered successfully")
 
         # Find and fill password field
-        password_field = None
-        password_selectors = [
-            (By.ID, "txtPassword"),
-            (By.NAME, "password"),
-            (By.NAME, "txtPassword"),
-            (By.CSS_SELECTOR, "input[type='password']"),
-            (By.XPATH, "//input[@type='password']"),
-        ]
-
-        for selector_type, selector_value in password_selectors:
-            try:
-                password_field = driver.find_element(selector_type, selector_value)
-                print(f"Found password field with: {selector_type} = {selector_value}")
-                break
-            except:
-                continue
-
-        if not password_field:
-            raise TimeoutException("Password field not found")
-
+        print("Looking for password field...")
+        password_field = driver.find_element(By.NAME, "password")
         password_field.clear()
         password_field.send_keys(password)
         print("Password entered successfully")
 
         # Click login button
-        login_button = None
-        login_button_selectors = [
-            (By.ID, "btnLogin"),
-            (By.NAME, "btnLogin"),
-            (By.CSS_SELECTOR, "button[type='submit']"),
-            (By.CSS_SELECTOR, "input[type='submit']"),
-            (By.XPATH, "//button[contains(text(), 'Login') or contains(text(), 'Sign In')]"),
-            (By.XPATH, "//input[@type='submit']"),
-        ]
-
-        for selector_type, selector_value in login_button_selectors:
-            try:
-                login_button = driver.find_element(selector_type, selector_value)
-                print(f"Found login button with: {selector_type} = {selector_value}")
-                break
-            except:
-                continue
-
-        if not login_button:
-            raise TimeoutException("Login button not found")
-
+        print("Looking for login button...")
+        login_button = driver.find_element(By.CSS_SELECTOR, "input[type='submit']")
         login_button.click()
         print("Login button clicked")
 
@@ -161,36 +100,86 @@ def export_treatment_data(driver):
     """Navigate to export page and trigger export"""
     print("Navigating to Treatment Thread Export page...")
     driver.get("https://wefortify.reliatrax.net/TreatmentThread.aspx/ThreadExport")
-    
+
     try:
-        wait = WebDriverWait(driver, 15)
-        
+        wait = WebDriverWait(driver, 20)
+
         # Wait for page to load
-        wait.until(EC.presence_of_element_located((By.XPATH, "//button[contains(text(), 'CSV Row View')]")))
-        
-        # Set date range to "All Folders" and include all values
-        # Check the "Include All Values" checkbox if not already checked
-        include_all_checkbox = driver.find_element(By.ID, "chkIncludeAllValues")
-        if not include_all_checkbox.is_selected():
-            include_all_checkbox.click()
-        
-        print("Clicking CSV Row View export...")
-        
-        # Click the CSV Row View button
-        csv_button = driver.find_element(By.XPATH, "//button[contains(text(), 'CSV Row View')]")
+        print("Waiting for export page to load...")
+        time.sleep(2)
+
+        # Try to find the CSV button first (indicates page loaded)
+        csv_button = None
+        csv_button_selectors = [
+            (By.XPATH, "//button[contains(text(), 'CSV Row View')]"),
+            (By.XPATH, "//button[contains(text(), 'CSV')]"),
+            (By.XPATH, "//input[@type='button' and contains(@value, 'CSV')]"),
+            (By.CSS_SELECTOR, "button[id*='CSV'], input[id*='CSV']"),
+        ]
+
+        for selector_type, selector_value in csv_button_selectors:
+            try:
+                print(f"Looking for CSV button with: {selector_type} = {selector_value}")
+                csv_button = wait.until(EC.presence_of_element_located((selector_type, selector_value)))
+                print(f"Found CSV button!")
+                break
+            except:
+                continue
+
+        if not csv_button:
+            print("Could not find CSV button!")
+            print("Saving page source for debugging...")
+            with open("/tmp/export_page_source.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            driver.save_screenshot("/tmp/export_page_load_error.png")
+            raise Exception("CSV button not found")
+
+        # Try to find and check the "Include All Values" checkbox (if it exists)
+        print("Looking for 'Include All Values' checkbox...")
+        include_all_checkbox = None
+        checkbox_selectors = [
+            (By.ID, "chkIncludeAllValues"),
+            (By.NAME, "chkIncludeAllValues"),
+            (By.XPATH, "//input[@type='checkbox' and contains(@id, 'IncludeAll')]"),
+            (By.XPATH, "//input[@type='checkbox' and contains(@name, 'IncludeAll')]"),
+            (By.CSS_SELECTOR, "input[type='checkbox'][id*='Include']"),
+        ]
+
+        for selector_type, selector_value in checkbox_selectors:
+            try:
+                include_all_checkbox = driver.find_element(selector_type, selector_value)
+                print(f"Found checkbox with: {selector_type} = {selector_value}")
+                break
+            except:
+                continue
+
+        if include_all_checkbox:
+            if not include_all_checkbox.is_selected():
+                print("Checking 'Include All Values' checkbox...")
+                include_all_checkbox.click()
+                time.sleep(1)
+            else:
+                print("Checkbox already checked")
+        else:
+            print("'Include All Values' checkbox not found - continuing without it")
+
+        print("Clicking CSV export button...")
         csv_button.click()
-        
+
         # Wait for the data table to appear (it visualizes before download)
         time.sleep(5)
-        
+
         # Extract table data from the page
         table_data = extract_table_data(driver)
-        
+
         return table_data
-        
+
     except Exception as e:
         print(f"Error during export: {e}")
         driver.save_screenshot("/tmp/export_error.png")
+        print("Saving page source for debugging...")
+        with open("/tmp/export_error_page_source.html", "w", encoding="utf-8") as f:
+            f.write(driver.page_source)
         raise
 
 def extract_table_data(driver):
