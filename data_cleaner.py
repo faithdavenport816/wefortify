@@ -73,6 +73,9 @@ PROGRAM_YEARS = {
 
 def get_sheets_client():
     """Get authenticated Google Sheets client"""
+    import warnings
+    warnings.filterwarnings('ignore', category=DeprecationWarning)
+
     scope = [
         'https://spreadsheets.google.com/feeds',
         'https://www.googleapis.com/auth/drive'
@@ -277,16 +280,19 @@ def process_treatment_thread_export(treatment_thread, survey_mapping, value_clea
         # Clean the value
         cleaned_value = value_cleaning_map.get(raw_value, raw_value)
 
-        # Parse datetime
+        # Parse datetime - combine separate date and time columns
         try:
+            # Parse date (e.g., "1/19/2026")
             date_obj = parse_date_flexible(date_value)
-            time_obj = parse_date_flexible(time_value)
+
+            # Parse time (e.g., "6:51 PM")
+            hour, minute, second = parse_time_flexible(time_value)
 
             # Combine date and time
-            combined = datetime(date_obj.year, date_obj.month, date_obj.day,
-                              time_obj.hour, time_obj.minute)
+            combined = datetime(date_obj.year, date_obj.month, date_obj.day, hour, minute, second)
             formatted_date = combined.strftime(DATE_FORMAT)
-        except:
+        except Exception:
+            # Fallback to just the date string if something goes wrong
             formatted_date = str(date_value)
 
         treatment_instance_code = f"{patient_id}-{formatted_date}"
@@ -321,12 +327,32 @@ def join_skeleton_with_responses(skeleton_data, response_data):
     output_data = [skeleton_headers + ['Value']]
     skeleton_key_index = skeleton_headers.index('QuestionTreatmentInstanceCode')
 
+    matched_count = 0
+    unmatched_count = 0
+
     for row in skeleton_data[1:]:
         key = row[skeleton_key_index]
         value = response_map.get(key, '')
+        if value != '':
+            matched_count += 1
+        else:
+            unmatched_count += 1
         output_data.append(row + [value])
 
     print(f"  Joined data: {len(output_data)-1} rows")
+    print(f"  Matched: {matched_count} rows, Unmatched: {unmatched_count} rows")
+
+    # Show sample of unmatched keys for debugging
+    if unmatched_count > 0:
+        unmatched_sample = []
+        for row in skeleton_data[1:]:
+            key = row[skeleton_key_index]
+            if response_map.get(key, '') == '':
+                unmatched_sample.append(key)
+                if len(unmatched_sample) >= 3:
+                    break
+        print(f"  Sample unmatched keys: {unmatched_sample[:3]}")
+
     return output_data
 
 
@@ -344,7 +370,7 @@ def parse_date_flexible(date_value):
         '%m/%d/%Y %I:%M:%S %p',  # 4/11/2022 11:53:28 PM
         '%m/%d/%Y %H:%M:%S',
         '%Y-%m-%d',
-        '%m/%d/%Y'
+        '%m/%d/%Y'           # 1/19/2026
     ]
 
     for fmt in formats:
@@ -356,6 +382,33 @@ def parse_date_flexible(date_value):
     # If all fail, return current time
     print(f"Warning: Could not parse date '{date_value}'")
     return datetime.now()
+
+
+def parse_time_flexible(time_value):
+    """Parse time-only values from various formats"""
+    if isinstance(time_value, datetime):
+        return time_value.hour, time_value.minute, time_value.second
+
+    if not isinstance(time_value, str):
+        return 0, 0, 0
+
+    # Try multiple time formats
+    time_formats = [
+        '%I:%M %p',      # 6:51 PM
+        '%I:%M:%S %p',   # 6:51:30 PM
+        '%H:%M',         # 18:51
+        '%H:%M:%S'       # 18:51:30
+    ]
+
+    for fmt in time_formats:
+        try:
+            parsed = datetime.strptime(time_value, fmt)
+            return parsed.hour, parsed.minute, parsed.second
+        except:
+            continue
+
+    # If all fail, return zeros
+    return 0, 0, 0
 
 
 def fill_forward_values(joined_data):
