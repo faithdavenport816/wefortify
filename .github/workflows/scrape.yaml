@@ -35,12 +35,12 @@ jobs:
         GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
       run: python scraper.py
 
-    - name: Run ReliaTrax Client Daily Summary Export
-      env:
-        RELIATRAX_USERNAME: ${{ secrets.RELIATRAX_USERNAME }}
-        RELIATRAX_PASSWORD: ${{ secrets.RELIATRAX_PASSWORD }}
-        GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
-      run: python client_daily_summary_export.py
+    ##- name: Run ReliaTrax Client Daily Summary Export
+    ##  env:
+    ##    RELIATRAX_USERNAME: ${{ secrets.RELIATRAX_USERNAME }}
+     ##   RELIATRAX_PASSWORD: ${{ secrets.RELIATRAX_PASSWORD }}
+    ##    GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
+    ##  run: python client_daily_summary_export.py
 
     - name: Run Data Cleaning Pipeline
       env:
