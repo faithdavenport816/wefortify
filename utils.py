@@ -100,19 +100,33 @@ def get_sheets_client():
     return client
 
 
-def write_to_sheets(data, sheet_id, clear_first=True):
+def write_to_sheets(data, sheet_id, worksheet_name=None, clear_first=True):
     """Write extracted data to Google Sheets
 
     Args:
         data: Dict with 'headers' and 'rows' keys
         sheet_id: Google Sheets ID
+        worksheet_name: Name of the worksheet/tab (e.g., "Sheet1", "Treatment Data").
+                       If None, uses the first sheet.
         clear_first: If True, clears existing data before writing
     """
     print("Connecting to Google Sheets...")
 
     client = get_sheets_client()
     spreadsheet = client.open_by_key(sheet_id)
-    sheet = spreadsheet.sheet1
+
+    # Select the worksheet by name, or use first sheet if not specified
+    if worksheet_name:
+        print(f"Opening worksheet: {worksheet_name}")
+        try:
+            sheet = spreadsheet.worksheet(worksheet_name)
+        except Exception as e:
+            print(f"Worksheet '{worksheet_name}' not found. Available worksheets:")
+            for ws in spreadsheet.worksheets():
+                print(f"  - {ws.title}")
+            raise Exception(f"Worksheet '{worksheet_name}' does not exist") from e
+    else:
+        sheet = spreadsheet.sheet1
 
     if clear_first:
         print("Clearing existing sheet data...")
@@ -136,7 +150,7 @@ def write_to_sheets(data, sheet_id, clear_first=True):
     all_data = [headers] + rows_with_timestamp
     sheet.update('A1', all_data)
 
-    print(f"Successfully wrote {len(data['rows'])} rows to Google Sheet!")
+    print(f"Successfully wrote {len(data['rows'])} rows to worksheet '{sheet.title}'!")
 
 
 def wait_for_csv_download(download_dir="/tmp", max_wait=30):
