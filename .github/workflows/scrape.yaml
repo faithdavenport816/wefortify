@@ -1,9 +1,9 @@
 name: ReliaTrax Daily Export
 
 on:
-  # schedule:
-  #   # Runs daily at 9 AM UTC (adjust timezone as needed)
-  #   - cron: '0 9 * * *'
+  schedule:
+    # Runs daily at 9 AM UTC
+    - cron: '0 9 * * *'
   workflow_dispatch:  # Allows manual triggering from GitHub UI
 
 jobs:
