@@ -238,9 +238,10 @@ def write_to_sheets(data):
     sheet_id = os.environ['SHEET_ID']
     spreadsheet = client.open_by_key(sheet_id)
     sheet = spreadsheet.sheet1
-    
-    # Check if sheet is empty (first run)
-    existing_data = sheet.get_all_values()
+
+    # Clear existing data
+    print("Clearing existing sheet data...")
+    sheet.clear()
 
     # Add timestamp column to headers
     headers = data["headers"].copy()
@@ -255,15 +256,10 @@ def write_to_sheets(data):
         row_with_timestamp = row + [timestamp]
         rows_with_timestamp.append(row_with_timestamp)
 
-    if not existing_data:
-        # First run - add headers and all data in one batch
-        print("First run detected. Adding headers and data...")
-        all_data = [headers] + rows_with_timestamp
-        sheet.update('A1', all_data)
-    else:
-        # Append all rows in one batch operation
-        print(f"Appending {len(rows_with_timestamp)} rows in batch...")
-        sheet.append_rows(rows_with_timestamp, value_input_option='USER_ENTERED')
+    # Add headers and all data in one batch
+    print(f"Writing headers and {len(rows_with_timestamp)} rows...")
+    all_data = [headers] + rows_with_timestamp
+    sheet.update('A1', all_data)
 
     print(f"Successfully wrote {len(data['rows'])} rows to Google Sheet!")
 
