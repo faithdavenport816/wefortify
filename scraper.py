@@ -94,7 +94,7 @@ def export_treatment_data(driver, start_date, end_date):
 def main():
     # Configure your Google Sheet ID and worksheet tab name
     SHEET_ID = "196rg3YfpssRLsdFig4yN9G3U9NrQFPEeROnr1oSNGCA"
-    WORKSHEET_NAME = "Treatment Thread"  # UPDATE THIS to your tab name
+    WORKSHEET_NAME = "treatment_thread_export"  # UPDATE THIS to your tab name
 
     driver = None
 
