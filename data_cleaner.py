@@ -10,12 +10,6 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from oauth2client.service_account import ServiceAccountCredentials
 
-# Determine the correct date format directive based on platform
-if platform.system() == 'Windows':
-    DATE_FORMAT = '%#m-%#d-%Y-%H-%M'  # Windows uses #
-else:
-    DATE_FORMAT = '%-m-%-d-%Y-%H-%M'  # Linux/Mac uses -
-
 
 # Configuration
 SHEET_ID = "196rg3YfpssRLsdFig4yN9G3U9NrQFPEeROnr1oSNGCA"
@@ -114,8 +108,8 @@ def write_sheet_data(client, sheet_id, worksheet_name, data):
         cleaned_row = []
         for cell in row:
             if isinstance(cell, datetime):
-                # Format datetime as string
-                cleaned_row.append(cell.strftime('%m/%d/%Y %I:%M:%S %p'))
+                # Format datetime as DATE ONLY (no time)
+                cleaned_row.append(cell.strftime('%m/%d/%Y'))
             elif cell is True:
                 cleaned_row.append('TRUE')
             elif cell is False:
@@ -234,10 +228,18 @@ def create_skeleton(daily_summary, unique_pairs):
         if survey_code not in [9000, 1000, 1001]:
             continue
 
+        # Parse and truncate date to date-only (no time)
+        try:
+            date_obj = parse_date_flexible(survey_date)
+            # Store as date-only string
+            survey_date_only = date_obj.strftime('%m/%d/%Y')
+        except:
+            survey_date_only = survey_date
+
         # Add row for each question in this survey
         for pair_survey_code, survey_name, question_code in unique_pairs:
             if pair_survey_code == str(survey_code):
-                skeleton_data.append([patient_id, survey_date, survey_code, survey_name, question_code])
+                skeleton_data.append([patient_id, survey_date_only, survey_code, survey_name, question_code])
 
     print(f"  Created skeleton with {len(skeleton_data)-1} rows")
     return skeleton_data
@@ -255,12 +257,13 @@ def generate_instance_codes(skeleton_data):
         survey_date = row[1]
         question_code = row[4]
 
-        # Parse date and format as M-D-YYYY-HH-mm
+        # Parse date and format as M-D-YYYY (DATE ONLY, no time)
         try:
             date_obj = parse_date_flexible(survey_date)
-            formatted_date = date_obj.strftime(DATE_FORMAT)
+            # Use date-only format for instance codes
+            formatted_date = date_obj.strftime('%-m-%-d-%Y') if platform.system() != 'Windows' else date_obj.strftime('%#m-%#d-%Y')
         except:
-            formatted_date = str(survey_date)
+            formatted_date = str(survey_date).replace('/', '-')
 
         treatment_instance_code = f"{patient_id}-{formatted_date}"
         question_treatment_instance_code = f"{treatment_instance_code}-{question_code}"
@@ -296,20 +299,16 @@ def process_treatment_thread_export(treatment_thread, survey_mapping, value_clea
         # Clean the value
         cleaned_value = value_cleaning_map.get(raw_value, raw_value)
 
-        # Parse datetime - combine separate date and time columns
+        # Parse date only (ignore time for matching purposes)
         try:
             # Parse date (e.g., "1/19/2026")
             date_obj = parse_date_flexible(date_value)
 
-            # Parse time (e.g., "6:51 PM")
-            hour, minute, second = parse_time_flexible(time_value)
-
-            # Combine date and time
-            combined = datetime(date_obj.year, date_obj.month, date_obj.day, hour, minute, second)
-            formatted_date = combined.strftime(DATE_FORMAT)
+            # Format as M-D-YYYY (DATE ONLY, no time)
+            formatted_date = date_obj.strftime('%-m-%-d-%Y') if platform.system() != 'Windows' else date_obj.strftime('%#m-%#d-%Y')
         except Exception:
             # Fallback to just the date string if something goes wrong
-            formatted_date = str(date_value)
+            formatted_date = str(date_value).replace('/', '-')
 
         treatment_instance_code = f"{patient_id}-{formatted_date}"
         question_treatment_instance_code = f"{treatment_instance_code}-{question_code}"
