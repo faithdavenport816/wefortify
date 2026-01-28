@@ -102,7 +102,16 @@ def write_sheet_data(client, sheet_id, worksheet_name, data):
         # Create worksheet if it doesn't exist
         worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=len(data), cols=len(data[0]))
 
-    # Convert any datetime objects to strings for JSON serialization
+    # Identify which columns contain dates (by checking first data row)
+    date_columns = set()
+    if len(data) > 1:
+        headers = data[0]
+        first_row = data[1]
+        for col_idx, cell in enumerate(first_row):
+            if isinstance(cell, datetime):
+                date_columns.add(col_idx)
+
+    # Convert data for upload
     cleaned_data = []
     for row in data:
         cleaned_row = []
@@ -118,7 +127,37 @@ def write_sheet_data(client, sheet_id, worksheet_name, data):
                 cleaned_row.append(cell)
         cleaned_data.append(cleaned_row)
 
-    worksheet.update('A1', cleaned_data)
+    # Upload data
+    worksheet.update('A1', cleaned_data, value_input_option='USER_ENTERED')
+
+    # Apply date formatting to date columns
+    if date_columns:
+        requests = []
+        for col_idx in date_columns:
+            requests.append({
+                'repeatCell': {
+                    'range': {
+                        'sheetId': worksheet.id,
+                        'startColumnIndex': col_idx,
+                        'endColumnIndex': col_idx + 1,
+                        'startRowIndex': 1,  # Skip header
+                        'endRowIndex': len(data)
+                    },
+                    'cell': {
+                        'userEnteredFormat': {
+                            'numberFormat': {
+                                'type': 'DATE',
+                                'pattern': 'm/d/yyyy'
+                            }
+                        }
+                    },
+                    'fields': 'userEnteredFormat.numberFormat'
+                }
+            })
+
+        if requests:
+            spreadsheet.batch_update({'requests': requests})
+
     print(f"  ✓ Written successfully")
 
 
