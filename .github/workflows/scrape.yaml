@@ -33,7 +33,6 @@ jobs:
         RELIATRAX_USERNAME: ${{ secrets.RELIATRAX_USERNAME }}
         RELIATRAX_PASSWORD: ${{ secrets.RELIATRAX_PASSWORD }}
         GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
-        SHEET_ID: ${{ secrets.SHEET_ID }}
       run: python scraper.py
 
     - name: Upload debug files on failure
