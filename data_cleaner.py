@@ -111,9 +111,9 @@ def write_sheet_data(client, sheet_id, worksheet_name, data):
                 # Format datetime as DATE ONLY (no time)
                 cleaned_row.append(cell.strftime('%m/%d/%Y'))
             elif cell is True:
-                cleaned_row.append('TRUE')
+                cleaned_row.append(1)
             elif cell is False:
-                cleaned_row.append('FALSE')
+                cleaned_row.append(0)
             else:
                 cleaned_row.append(cell)
         cleaned_data.append(cleaned_row)
@@ -289,7 +289,7 @@ def process_treatment_thread_export(treatment_thread, survey_mapping, value_clea
     for row in treatment_thread[1:]:
         patient_id = row[col['ClientID']]
         date_value = row[col['Date']]
-        time_value = row[col['Time']]
+        # Note: Time column exists but we ignore it - using date-only for matching
         survey_name = row[col['Document']]
         question_code = row[col['Code']]
         raw_value = row[value_col_index]
