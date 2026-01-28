@@ -42,6 +42,11 @@ jobs:
         GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
       run: python client_daily_summary_export.py
 
+    - name: Run Data Cleaning Pipeline
+      env:
+        GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
+      run: python data_cleaner.py
+
     - name: Upload debug files on failure
       if: failure()
       uses: actions/upload-artifact@v4
