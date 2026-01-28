@@ -10,7 +10,7 @@ import json
 import os
 import time
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def setup_driver():
     """Set up headless Chrome driver for GitHub Actions"""
@@ -94,7 +94,7 @@ def login_to_reliatrax(driver, username, password):
             f.write(driver.page_source)
         raise
 
-def export_treatment_data(driver):
+def export_treatment_data(driver, start_date, end_date):
     """Navigate to export page and trigger CSV download"""
     print("Navigating to Treatment Thread Export page...")
     driver.get("https://wefortify.reliatrax.net/TreatmentThread.aspx/ThreadExport")
@@ -115,6 +115,22 @@ def export_treatment_data(driver):
         select.select_by_value("1")  # Value "1" corresponds to "All Folders"
         print("Selected 'All Folders'")
         time.sleep(1)
+
+        # Set start date
+        print(f"Setting start date to {start_date}...")
+        start_date_field = wait.until(EC.presence_of_element_located((By.ID, "startDate")))
+        start_date_field.clear()
+        start_date_field.send_keys(start_date)
+        print("Start date set successfully")
+        time.sleep(0.5)
+
+        # Set end date
+        print(f"Setting end date to {end_date}...")
+        end_date_field = driver.find_element(By.ID, "endDate")
+        end_date_field.clear()
+        end_date_field.send_keys(end_date)
+        print("End date set successfully")
+        time.sleep(0.5)
 
         # Find the CSV Row View button
         print("Looking for CSV Row View button...")
@@ -269,9 +285,15 @@ def main():
         
         # Login
         login_to_reliatrax(driver, username, password)
-        
+
+        # Get date range: always from 01/01/2020 to today
+        end_date_str = datetime.now().strftime("%m/%d/%Y")
+        start_date_str = "01/01/2020"
+
+        print(f"Exporting data from {start_date_str} to {end_date_str}")
+
         # Export data
-        data = export_treatment_data(driver)
+        data = export_treatment_data(driver, start_date_str, end_date_str)
         
         if data["rows"]:
             # Write to Google Sheets
