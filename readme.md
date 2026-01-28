@@ -18,6 +18,17 @@ wefortify/
 ## Current Scrapers
 
 - **scraper.py**: Treatment Thread Export (01/01/2020 to today)
+- **client_daily_summary_export.py**: Client Daily Summary Export (01/01/2022 to today, monthly batches)
+
+## Data Pipeline
+
+After both scrapers complete, **data_cleaner.py** automatically runs to:
+1. Read raw exports from Google Sheets
+2. Clean and transform the data using the assessment dictionary
+3. Generate analytical frames:
+   - **long_frame**: Assessment data in long format with imputed values
+   - **wide_frame**: Pivoted view with questions as columns
+   - **yoy_frame**: Year-over-year metrics with aggregations and program year rollups
 
 ## Setup Instructions
 
@@ -152,7 +163,27 @@ end_date_str = datetime.now().strftime("%m/%d/%Y")
 
 - `utils.py` - Shared utilities for all scrapers
 - `scraper.py` - Treatment Thread Export scraper
+- `client_daily_summary_export.py` - Client Daily Summary Export scraper
+- `data_cleaner.py` - Data cleaning and transformation pipeline
 - `scraper_template.py` - Template for creating new scrapers
 - `requirements.txt` - Python dependencies
 - `.github/workflows/scrape.yaml` - GitHub Actions workflow
 - `readme.md` - This file
+
+## Workflow Execution Order
+
+When the workflow runs (daily at 9 AM UTC or manually triggered):
+
+1. **Treatment Thread Export** (`scraper.py`)
+   - Exports all treatment thread data from 01/01/2020 to today
+   - Writes to `treatment_thread_export` tab
+
+2. **Client Daily Summary Export** (`client_daily_summary_export.py`)
+   - Exports client daily activity from 01/01/2022 to today
+   - Loops through monthly batches (30-day limit)
+   - Writes to `client_summary_export` tab
+
+3. **Data Cleaning Pipeline** (`data_cleaner.py`)
+   - Reads raw exports + `assesment_dictionary` tab
+   - Cleans, transforms, and generates analytical frames
+   - Writes to `long_frame`, `wide_frame`, and `yoy_frame` tabs
