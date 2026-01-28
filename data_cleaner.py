@@ -5,9 +5,16 @@ Processes raw exported data into analytical frames (long, wide, yoy).
 import gspread
 import os
 import json
+import platform
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from oauth2client.service_account import ServiceAccountCredentials
+
+# Determine the correct date format directive based on platform
+if platform.system() == 'Windows':
+    DATE_FORMAT = '%#m-%#d-%Y-%H-%M'  # Windows uses #
+else:
+    DATE_FORMAT = '%-m-%-d-%Y-%H-%M'  # Linux/Mac uses -
 
 
 # Configuration
@@ -231,14 +238,10 @@ def generate_instance_codes(skeleton_data):
 
         # Parse date and format as M-D-YYYY-HH-mm
         try:
-            if isinstance(survey_date, str):
-                date_obj = datetime.strptime(survey_date, '%Y-%m-%d %H:%M:%S')
-            else:
-                date_obj = survey_date
-
-            formatted_date = date_obj.strftime('%-m-%-d-%Y-%H-%M')
+            date_obj = parse_date_flexible(survey_date)
+            formatted_date = date_obj.strftime(DATE_FORMAT)
         except:
-            formatted_date = survey_date
+            formatted_date = str(survey_date)
 
         treatment_instance_code = f"{patient_id}-{formatted_date}"
         question_treatment_instance_code = f"{treatment_instance_code}-{question_code}"
@@ -276,22 +279,15 @@ def process_treatment_thread_export(treatment_thread, survey_mapping, value_clea
 
         # Parse datetime
         try:
-            if isinstance(date_value, str):
-                date_obj = datetime.strptime(date_value, '%Y-%m-%d')
-            else:
-                date_obj = date_value
-
-            if isinstance(time_value, str):
-                time_obj = datetime.strptime(time_value, '%H:%M:%S')
-            else:
-                time_obj = time_value
+            date_obj = parse_date_flexible(date_value)
+            time_obj = parse_date_flexible(time_value)
 
             # Combine date and time
             combined = datetime(date_obj.year, date_obj.month, date_obj.day,
                               time_obj.hour, time_obj.minute)
-            formatted_date = combined.strftime('%-m-%-d-%Y-%H-%M')
+            formatted_date = combined.strftime(DATE_FORMAT)
         except:
-            formatted_date = date_value
+            formatted_date = str(date_value)
 
         treatment_instance_code = f"{patient_id}-{formatted_date}"
         question_treatment_instance_code = f"{treatment_instance_code}-{question_code}"
@@ -334,6 +330,34 @@ def join_skeleton_with_responses(skeleton_data, response_data):
     return output_data
 
 
+def parse_date_flexible(date_value):
+    """Parse date from various formats"""
+    if isinstance(date_value, datetime):
+        return date_value
+
+    if not isinstance(date_value, str):
+        return datetime.now()
+
+    # Try multiple date formats
+    formats = [
+        '%Y-%m-%d %H:%M:%S',
+        '%m/%d/%Y %I:%M:%S %p',  # 4/11/2022 11:53:28 PM
+        '%m/%d/%Y %H:%M:%S',
+        '%Y-%m-%d',
+        '%m/%d/%Y'
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_value, fmt)
+        except:
+            continue
+
+    # If all fail, return current time
+    print(f"Warning: Could not parse date '{date_value}'")
+    return datetime.now()
+
+
 def fill_forward_values(joined_data):
     """Fill forward missing values per patient+question combination"""
     print("Filling forward values...")
@@ -347,8 +371,7 @@ def fill_forward_values(joined_data):
     data_rows.sort(key=lambda x: (
         x[col['PatientID']],
         x[col['QuestionCode']],
-        datetime.strptime(x[col['TreatmentDate']], '%Y-%m-%d %H:%M:%S')
-            if isinstance(x[col['TreatmentDate']], str) else x[col['TreatmentDate']]
+        parse_date_flexible(x[col['TreatmentDate']])
     ))
 
     # Fill forward
@@ -434,10 +457,7 @@ def build_client_date_frame_distinct(assessment_frame_values):
 
         # Parse date
         try:
-            if isinstance(treatment_date, str):
-                date_obj = datetime.strptime(treatment_date, '%Y-%m-%d %H:%M:%S')
-            else:
-                date_obj = treatment_date
+            date_obj = parse_date_flexible(treatment_date)
         except:
             continue
 
