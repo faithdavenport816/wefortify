@@ -108,7 +108,23 @@ def write_sheet_data(client, sheet_id, worksheet_name, data):
         # Create worksheet if it doesn't exist
         worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=len(data), cols=len(data[0]))
 
-    worksheet.update('A1', data)
+    # Convert any datetime objects to strings for JSON serialization
+    cleaned_data = []
+    for row in data:
+        cleaned_row = []
+        for cell in row:
+            if isinstance(cell, datetime):
+                # Format datetime as string
+                cleaned_row.append(cell.strftime('%m/%d/%Y %I:%M:%S %p'))
+            elif cell is True:
+                cleaned_row.append('TRUE')
+            elif cell is False:
+                cleaned_row.append('FALSE')
+            else:
+                cleaned_row.append(cell)
+        cleaned_data.append(cleaned_row)
+
+    worksheet.update('A1', cleaned_data)
     print(f"  ✓ Written successfully")
 
 
