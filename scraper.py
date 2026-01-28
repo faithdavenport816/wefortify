@@ -10,7 +10,7 @@ import json
 import os
 import time
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def setup_driver():
     """Set up headless Chrome driver for GitHub Actions"""

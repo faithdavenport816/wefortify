@@ -36,13 +36,6 @@ jobs:
         SHEET_ID: ${{ secrets.SHEET_ID }}
       run: python scraper.py
 
-    - name: List all accessible Google Sheets
-      if: success()
-      env:
-        GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
-        SHEET_ID: ${{ secrets.SHEET_ID }}
-      run: python find_sheet.py
-
     - name: Upload debug files on failure
       if: failure()
       uses: actions/upload-artifact@v4
