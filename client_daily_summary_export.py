@@ -19,7 +19,8 @@ from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 from utils import (
     setup_driver,
@@ -104,10 +105,34 @@ def export_data(driver, start_date, end_date):
         raise
 
 
+def generate_monthly_ranges(start_date, end_date):
+    """Generate monthly date ranges between start_date and end_date
+
+    Args:
+        start_date: datetime object for start
+        end_date: datetime object for end
+
+    Returns:
+        List of tuples [(start1, end1), (start2, end2), ...]
+    """
+    ranges = []
+    current = start_date
+
+    while current < end_date:
+        # Get the last day of the current month or end_date, whichever is earlier
+        next_month = current + relativedelta(months=1)
+        month_end = min(next_month - timedelta(days=1), end_date)
+
+        ranges.append((current, month_end))
+        current = next_month
+
+    return ranges
+
+
 def main():
     # Configure your Google Sheet ID and worksheet tab name
     SHEET_ID = "196rg3YfpssRLsdFig4yN9G3U9NrQFPEeROnr1oSNGCA"
-    WORKSHEET_NAME = "client_summary_export"  # UPDATE THIS to your tab name
+    WORKSHEET_NAME = "client_summary_export"
 
     driver = None
 
@@ -122,18 +147,57 @@ def main():
         # Login (reuses shared login function)
         login_to_reliatrax(driver, username, password)
 
-        # Set date range (customize as needed)
-        end_date_str = datetime.now().strftime("%m/%d/%Y")
-        start_date_str = "01/01/2026"  # Or customize your date range
+        # Set overall date range - loop through monthly from 2022-01-01 to today
+        overall_start = datetime(2022, 1, 1)
+        overall_end = datetime.now()
 
-        print(f"Exporting data from {start_date_str} to {end_date_str}")
+        print(f"Exporting data from {overall_start.strftime('%m/%d/%Y')} to {overall_end.strftime('%m/%d/%Y')}")
+        print("This will be done in monthly chunks due to 30-day limit...")
 
-        # Export data
-        data = export_data(driver, start_date_str, end_date_str)
+        # Generate monthly date ranges
+        monthly_ranges = generate_monthly_ranges(overall_start, overall_end)
+        print(f"Total months to process: {len(monthly_ranges)}")
 
-        if data["rows"]:
-            # Write to Google Sheets - specify worksheet name to write to specific tab
-            write_to_sheets(data, SHEET_ID, worksheet_name=WORKSHEET_NAME, clear_first=True)
+        # Collect all data across all months
+        all_headers = None
+        all_rows = []
+
+        for i, (month_start, month_end) in enumerate(monthly_ranges, 1):
+            start_str = month_start.strftime("%m/%d/%Y")
+            end_str = month_end.strftime("%m/%d/%Y")
+
+            print(f"\n[{i}/{len(monthly_ranges)}] Exporting {start_str} to {end_str}...")
+
+            try:
+                data = export_data(driver, start_str, end_str)
+
+                if data["rows"]:
+                    # Store headers from first successful export
+                    if all_headers is None:
+                        all_headers = data["headers"]
+
+                    # Add rows to combined data
+                    all_rows.extend(data["rows"])
+                    print(f"  ✓ Retrieved {len(data['rows'])} rows")
+                else:
+                    print(f"  - No data for this period")
+
+            except Exception as e:
+                print(f"  ✗ Error exporting {start_str} to {end_str}: {e}")
+                # Continue with next month instead of failing completely
+                continue
+
+        # Write all combined data to Google Sheets
+        if all_rows and all_headers:
+            combined_data = {
+                "headers": all_headers,
+                "rows": all_rows
+            }
+
+            print(f"\n{'='*60}")
+            print(f"Total rows collected: {len(all_rows)}")
+            print("Writing combined data to Google Sheets...")
+            write_to_sheets(combined_data, SHEET_ID, worksheet_name=WORKSHEET_NAME, clear_first=True)
             print("Export completed successfully!")
         else:
             print("No data to export.")
