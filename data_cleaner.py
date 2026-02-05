@@ -1030,6 +1030,80 @@ def attendance_frame(treatment_thread, client_summary):
     return [output_headers] + ranked_rows
 
 
+def resident_info_frame(treatment_thread):
+    """Build resident info frame by pivoting /Resident Information Capture data to wide format."""
+    print("Building resident info frame...")
+
+    # Define the codes we want as columns
+    target_codes = [
+        'home-number', 'lease-signed-date', 'life-skills-classes',
+        'moved-into-other-housing', 'moveout-date', 'moveout-reason',
+        'reason-entering', 'referring-agency', 'therapist-status'
+    ]
+
+    tt_headers = treatment_thread[0]
+    tt_col = get_column_indices(tt_headers)
+
+    # Group by ClientID and collect all matching records
+    client_records = {}
+
+    for row in treatment_thread[1:]:
+        folder = row[tt_col['Folder']]
+        if folder != '/Resident Information Capture':
+            continue
+
+        client_id = row[tt_col['ClientID']]
+        code = row[tt_col['Code']]
+
+        # Only process codes we care about
+        if code not in target_codes:
+            continue
+
+        # Parse date and time for sorting
+        date_obj = parse_date_flexible(row[tt_col['Date']])
+        h, m, s = parse_time_flexible(row[tt_col['Time']])
+        dt_obj = date_obj.replace(hour=h, minute=m, second=s)
+
+        value = row[tt_col['Value']]
+
+        if client_id not in client_records:
+            client_records[client_id] = []
+
+        client_records[client_id].append({
+            'datetime': dt_obj,
+            'code': code,
+            'value': value
+        })
+
+    # For each client, pick the most recent record and pivot to wide
+    output_headers = ['ClientID'] + target_codes
+    output_rows = []
+
+    for client_id, records in client_records.items():
+        # Sort by datetime descending (most recent first)
+        records.sort(key=lambda x: x['datetime'], reverse=True)
+
+        # Build a dict of code -> value, taking the most recent for each code
+        code_values = {}
+        for rec in records:
+            code = rec['code']
+            if code not in code_values:  # Take first (most recent) occurrence
+                code_values[code] = rec['value']
+
+        # Build output row
+        row = [client_id]
+        for code in target_codes:
+            row.append(code_values.get(code, ''))
+
+        output_rows.append(row)
+
+    # Sort by ClientID for consistency
+    output_rows.sort(key=lambda x: x[0])
+
+    print(f"  Resident info frame: {len(output_rows)} rows")
+    return [output_headers] + output_rows
+
+
 def main():
     """Main data cleaning pipeline"""
     print("="*60)
@@ -1083,6 +1157,9 @@ def main():
     # Build attendance frame
     attendance = attendance_frame(treatment_thread, daily_summary)
 
+    # Build resident info frame
+    resident_info = resident_info_frame(treatment_thread)
+
     # Write output sheets
     print("\n" + "="*60)
     print("Writing output sheets...")
@@ -1091,6 +1168,7 @@ def main():
     write_sheet_data(client, SHEET_ID, 'wide_frame', wide_data)
     write_sheet_data(client, SHEET_ID, 'yoy_frame', long_with_aggs)
     write_sheet_data(client, SHEET_ID, 'attendance_frame', attendance)
+    write_sheet_data(client, SHEET_ID, 'resident_info_frame', resident_info)
 
     print("\n" + "="*60)
     print("✓ Data cleaning pipeline completed successfully!")
