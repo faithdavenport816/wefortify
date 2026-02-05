@@ -954,7 +954,7 @@ def pivot_assessment_data(survey_code, question_codes, data_frame):
     return output_data
 
 
-def attendence_frame(treatment_thread, client_summary):
+def attendance_frame(treatment_thread, client_summary):
     """Build attendance frame by unioning filtered treatment thread and client summary data."""
     print("Building attendance frame...")
 
@@ -1081,7 +1081,7 @@ def main():
     )
 
     # Build attendance frame
-    attendance = attendence_frame(treatment_thread, daily_summary)
+    attendance = attendance_frame(treatment_thread, daily_summary)
 
     # Write output sheets
     print("\n" + "="*60)
@@ -1090,7 +1090,7 @@ def main():
     write_sheet_data(client, SHEET_ID, 'long_frame', final_data)
     write_sheet_data(client, SHEET_ID, 'wide_frame', wide_data)
     write_sheet_data(client, SHEET_ID, 'yoy_frame', long_with_aggs)
-    write_sheet_data(client, SHEET_ID, 'attendence_frame', attendance)
+    write_sheet_data(client, SHEET_ID, 'attendance_frame', attendance)
 
     print("\n" + "="*60)
     print("✓ Data cleaning pipeline completed successfully!")
