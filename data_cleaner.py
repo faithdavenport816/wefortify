@@ -954,6 +954,60 @@ def pivot_assessment_data(survey_code, question_codes, data_frame):
     return output_data
 
 
+def attendence_frame(treatment_thread, client_summary):
+    """Build attendance frame by unioning filtered treatment thread and client summary data."""
+    print("Building attendance frame...")
+
+    output_headers = ['ClientID', 'Code', 'Date', 'Time', 'Value']
+    rows = []
+
+    # --- treatment_thread_export: filter to Code == 'has-budget' ---
+    tt_headers = treatment_thread[0]
+    tt_col = get_column_indices(tt_headers)
+
+    for row in treatment_thread[1:]:
+        if row[tt_col['Code']] != 'has-budget':
+            continue
+        rows.append([
+            row[tt_col['ClientID']],
+            row[tt_col['Code']],
+            row[tt_col['Date']],
+            row[tt_col['Time']],
+            row[tt_col['Value']]
+        ])
+
+    print(f"  Treatment thread rows (has-budget): {len(rows)}")
+
+    # --- client_summary_export: filter to target TreatmentDescript values ---
+    cs_headers = client_summary[0]
+    cs_col = get_column_indices(cs_headers)
+    target_descriptions = ['Individual Case Management', 'Resident Association Meeting']
+    cs_count = 0
+
+    for row in client_summary[1:]:
+        descrip = row[cs_col['TreatmentDescript']]
+        if descrip not in target_descriptions:
+            continue
+
+        # Parse TreatmentDT into separate date and time
+        date_obj = parse_date_flexible(row[cs_col['TreatmentDT']])
+        date_str = date_obj.strftime('%-m/%-d/%Y') if platform.system() != 'Windows' else date_obj.strftime('%#m/%#d/%Y')
+        time_str = date_obj.strftime('%-I:%M %p') if platform.system() != 'Windows' else date_obj.strftime('%#I:%M %p')
+
+        rows.append([
+            row[cs_col['PatientID']],   # ClientID
+            descrip,                     # Code — imputed from TreatmentDescript
+            date_str,                    # Date
+            time_str,                    # Time
+            ''                           # Value
+        ])
+        cs_count += 1
+
+    print(f"  Client summary rows: {cs_count}")
+    print(f"  Attendance frame total: {len(rows)} rows")
+    return [output_headers] + rows
+
+
 def main():
     """Main data cleaning pipeline"""
     print("="*60)
@@ -1004,6 +1058,9 @@ def main():
         client_date_frame, final_data, AGGREGATION_CONFIG
     )
 
+    # Build attendance frame
+    attendance = attendence_frame(treatment_thread, daily_summary)
+
     # Write output sheets
     print("\n" + "="*60)
     print("Writing output sheets...")
@@ -1011,6 +1068,7 @@ def main():
     write_sheet_data(client, SHEET_ID, 'long_frame', final_data)
     write_sheet_data(client, SHEET_ID, 'wide_frame', wide_data)
     write_sheet_data(client, SHEET_ID, 'yoy_frame', long_with_aggs)
+    write_sheet_data(client, SHEET_ID, 'attendence_frame', attendance)
 
     print("\n" + "="*60)
     print("✓ Data cleaning pipeline completed successfully!")
