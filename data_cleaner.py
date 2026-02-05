@@ -958,7 +958,7 @@ def attendence_frame(treatment_thread, client_summary):
     """Build attendance frame by unioning filtered treatment thread and client summary data."""
     print("Building attendance frame...")
 
-    output_headers = ['ClientID', 'Code', 'Date', 'Time', 'Value']
+    output_headers = ['ClientID', 'Code', 'Date', 'Time', 'Value', 'attendee_status', 'client_meeting_rank']
     rows = []
 
     # --- treatment_thread_export: filter to Code == 'has-budget' ---
@@ -970,10 +970,11 @@ def attendence_frame(treatment_thread, client_summary):
             continue
         rows.append([
             row[tt_col['ClientID']],
-            row[tt_col['Code']],
+            'Individual Case Management',
             row[tt_col['Date']],
             row[tt_col['Time']],
-            row[tt_col['Value']]
+            row[tt_col['Value']],
+            'ABSENCE'
         ])
 
     print(f"  Treatment thread rows (has-budget): {len(rows)}")
@@ -999,13 +1000,34 @@ def attendence_frame(treatment_thread, client_summary):
             descrip,                     # Code — imputed from TreatmentDescript
             date_str,                    # Date
             time_str,                    # Time
-            ''                           # Value
+            '',                          # Value
+            'ATTENDED'
         ])
         cs_count += 1
 
     print(f"  Client summary rows: {cs_count}")
-    print(f"  Attendance frame total: {len(rows)} rows")
-    return [output_headers] + rows
+
+    # Assign client_meeting_rank: partitioned by ClientID + Code, ordered by Date/Time desc
+    def sort_key(row):
+        date_obj = parse_date_flexible(row[2])
+        h, m, s = parse_time_flexible(row[3])
+        return date_obj.replace(hour=h, minute=m, second=s)
+
+    groups = {}
+    for row in rows:
+        key = (row[0], row[1])  # ClientID, Code
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(row)
+
+    ranked_rows = []
+    for group in groups.values():
+        group.sort(key=sort_key, reverse=True)
+        for rank, row in enumerate(group, 1):
+            ranked_rows.append(row + [rank])
+
+    print(f"  Attendance frame total: {len(ranked_rows)} rows")
+    return [output_headers] + ranked_rows
 
 
 def main():
