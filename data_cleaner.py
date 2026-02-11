@@ -1090,7 +1090,7 @@ def resident_info_frame(treatment_thread, client_info_map=None):
         })
 
     # For each client, pick the most recent record and pivot to wide
-    output_headers = ['ClientID'] + contact_fields + target_codes
+    output_headers = ['ClientID'] + contact_fields + ['is_active_resident'] + target_codes
     output_rows = []
 
     for client_id, records in client_records.items():
@@ -1107,10 +1107,16 @@ def resident_info_frame(treatment_thread, client_info_map=None):
         # Get contact info from scraped data (if available)
         contact_info = client_info_map.get(client_id, {})
 
-        # Build output row: ClientID + contact fields + target codes
+        # Determine if active resident (inactive if moveout-reason OR moveout-date has a value)
+        moveout_reason = code_values.get('moveout-reason', '')
+        moveout_date = code_values.get('moveout-date', '')
+        is_active_resident = 0 if (moveout_reason or moveout_date) else 1
+
+        # Build output row: ClientID + contact fields + is_active_resident + target codes
         row = [client_id]
         for field in contact_fields:
             row.append(contact_info.get(field, ''))
+        row.append(is_active_resident)
         for code in target_codes:
             row.append(code_values.get(code, ''))
 
