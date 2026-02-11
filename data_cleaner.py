@@ -1110,7 +1110,7 @@ def resident_info_frame(treatment_thread, client_info_map=None):
         # Determine if active resident (inactive if moveout-reason OR moveout-date has a value)
         moveout_reason = code_values.get('moveout-reason', '')
         moveout_date = code_values.get('moveout-date', '')
-        is_active_resident = 0 if (moveout_reason or moveout_date) else 1
+        is_active_resident = 'No' if (moveout_reason or moveout_date) else 'Yes'
 
         # Build output row: ClientID + contact fields + is_active_resident + target codes
         row = [client_id]
