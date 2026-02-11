@@ -65,7 +65,8 @@ def scrape_client_info(driver, client_id):
         # Initialize result with ClientID
         result = {
             'ClientID': client_id,
-            'Name': '',
+            'FirstName': '',
+            'LastName': '',
             'DOB': '',
             'Nickname': '',
             'PhoneNumber': '',
@@ -85,11 +86,25 @@ def scrape_client_info(driver, client_id):
             # Pattern: Name (DOB) "Nickname" or Name (DOB)
             name_match = re.match(r'^([^(]+)\s*\(([^)]+)\)\s*(?:"([^"]+)")?', name_text)
             if name_match:
-                result['Name'] = name_match.group(1).strip()
+                full_name = name_match.group(1).strip()
                 result['DOB'] = name_match.group(2).strip()
                 result['Nickname'] = name_match.group(3) or ''
+
+                # Split "LastName, FirstName" into separate fields
+                if ',' in full_name:
+                    parts = full_name.split(',', 1)
+                    result['LastName'] = parts[0].strip()
+                    result['FirstName'] = parts[1].strip()
+                else:
+                    result['LastName'] = full_name
             else:
-                result['Name'] = name_text.strip()
+                # Fallback: try to parse just the name
+                if ',' in name_text:
+                    parts = name_text.split(',', 1)
+                    result['LastName'] = parts[0].strip()
+                    result['FirstName'] = parts[1].strip()
+                else:
+                    result['LastName'] = name_text.strip()
         except Exception as e:
             print(f"    Warning: Could not find name element: {e}")
 
@@ -128,14 +143,15 @@ def scrape_client_info(driver, client_id):
         except Exception as e:
             print(f"    Warning: Could not find email: {e}")
 
-        print(f"    Scraped: {result['Name']} | {result['PhoneNumber']} | {result['Email']}")
+        print(f"    Scraped: {result['FirstName']} {result['LastName']} | {result['PhoneNumber']} | {result['Email']}")
         return result
 
     except Exception as e:
         print(f"    Error scraping client {client_id}: {e}")
         return {
             'ClientID': client_id,
-            'Name': '',
+            'FirstName': '',
+            'LastName': '',
             'DOB': '',
             'Nickname': '',
             'PhoneNumber': '',
@@ -158,17 +174,18 @@ def write_client_info_to_sheets(client, results):
         worksheet = spreadsheet.add_worksheet(
             title=OUTPUT_WORKSHEET,
             rows=len(results) + 1,
-            cols=6
+            cols=7
         )
 
     # Prepare data
-    headers = ['ClientID', 'Name', 'DOB', 'Nickname', 'PhoneNumber', 'Email']
+    headers = ['ClientID', 'FirstName', 'LastName', 'DOB', 'Nickname', 'PhoneNumber', 'Email']
     rows = [headers]
 
     for result in results:
         rows.append([
             result.get('ClientID', ''),
-            result.get('Name', ''),
+            result.get('FirstName', ''),
+            result.get('LastName', ''),
             result.get('DOB', ''),
             result.get('Nickname', ''),
             result.get('PhoneNumber', ''),
