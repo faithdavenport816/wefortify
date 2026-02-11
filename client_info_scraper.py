@@ -196,8 +196,13 @@ def scrape_all_clients(treatment_thread):
 
     try:
         # Get credentials from environment
-        username = os.environ['RELIATRAX_USERNAME']
-        password = os.environ['RELIATRAX_PASSWORD']
+        username = os.environ.get('RELIATRAX_USERNAME')
+        password = os.environ.get('RELIATRAX_PASSWORD')
+
+        if not username or not password:
+            print("WARNING: RELIATRAX_USERNAME or RELIATRAX_PASSWORD not set.")
+            print("Skipping client info scraping. Set these environment variables to enable.")
+            return []
 
         # Extract unique client IDs from treatment_thread data
         client_ids = get_unique_client_ids_from_treatment_thread(treatment_thread)
