@@ -44,6 +44,8 @@ jobs:
 
     - name: Run Data Cleaning Pipeline
       env:
+        RELIATRAX_USERNAME: ${{ secrets.RELIATRAX_USERNAME }}
+        RELIATRAX_PASSWORD: ${{ secrets.RELIATRAX_PASSWORD }}
         GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
       run: python data_cleaner.py
 
