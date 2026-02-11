@@ -10,6 +10,8 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from oauth2client.service_account import ServiceAccountCredentials
 
+from client_info_scraper import scrape_all_clients
+
 
 # Configuration
 SHEET_ID = "196rg3YfpssRLsdFig4yN9G3U9NrQFPEeROnr1oSNGCA"
@@ -1159,6 +1161,12 @@ def main():
 
     # Build resident info frame
     resident_info = resident_info_frame(treatment_thread)
+
+    # Scrape client contact info from ReliaTrax
+    print("\n" + "="*60)
+    print("Scraping client contact information...")
+    print("="*60)
+    scrape_all_clients(treatment_thread)
 
     # Write output sheets
     print("\n" + "="*60)
