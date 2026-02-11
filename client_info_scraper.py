@@ -19,7 +19,6 @@ from utils import (
 
 # Configuration
 SHEET_ID = "196rg3YfpssRLsdFig4yN9G3U9NrQFPEeROnr1oSNGCA"
-OUTPUT_WORKSHEET = "client_info_export"
 
 
 def get_unique_client_ids_from_treatment_thread(treatment_thread):
@@ -160,40 +159,21 @@ def scrape_client_info(driver, client_id):
         }
 
 
-def write_client_info_to_sheets(client, results):
-    """Write scraped client info to Google Sheets"""
-    print(f"\nWriting {len(results)} client records to {OUTPUT_WORKSHEET}...")
-
-    spreadsheet = client.open_by_key(SHEET_ID)
-
-    # Try to get existing worksheet, or create it
-    try:
-        worksheet = spreadsheet.worksheet(OUTPUT_WORKSHEET)
-        worksheet.clear()
-    except:
-        worksheet = spreadsheet.add_worksheet(
-            title=OUTPUT_WORKSHEET,
-            rows=len(results) + 1,
-            cols=7
-        )
-
-    # Prepare data
-    headers = ['ClientID', 'FirstName', 'LastName', 'DOB', 'Nickname', 'PhoneNumber', 'Email']
-    rows = [headers]
-
+def results_to_dict(results):
+    """Convert scraped results list to a dict keyed by ClientID for easy lookup"""
+    client_info_map = {}
     for result in results:
-        rows.append([
-            result.get('ClientID', ''),
-            result.get('FirstName', ''),
-            result.get('LastName', ''),
-            result.get('DOB', ''),
-            result.get('Nickname', ''),
-            result.get('PhoneNumber', ''),
-            result.get('Email', '')
-        ])
-
-    worksheet.update('A1', rows, value_input_option='USER_ENTERED')
-    print(f"Successfully wrote {len(results)} records to {OUTPUT_WORKSHEET}")
+        client_id = result.get('ClientID', '')
+        if client_id:
+            client_info_map[client_id] = {
+                'FirstName': result.get('FirstName', ''),
+                'LastName': result.get('LastName', ''),
+                'DOB': result.get('DOB', ''),
+                'Nickname': result.get('Nickname', ''),
+                'PhoneNumber': result.get('PhoneNumber', ''),
+                'Email': result.get('Email', '')
+            }
+    return client_info_map
 
 
 def scrape_all_clients(treatment_thread):
@@ -219,7 +199,7 @@ def scrape_all_clients(treatment_thread):
         if not username or not password:
             print("WARNING: RELIATRAX_USERNAME or RELIATRAX_PASSWORD not set.")
             print("Skipping client info scraping. Set these environment variables to enable.")
-            return []
+            return {}
 
         # Extract unique client IDs from treatment_thread data
         client_ids = get_unique_client_ids_from_treatment_thread(treatment_thread)
@@ -245,15 +225,12 @@ def scrape_all_clients(treatment_thread):
             # Small delay to avoid overwhelming the server
             time.sleep(0.5)
 
-        # Write results to Google Sheets
-        sheets_client = get_sheets_client()
-        write_client_info_to_sheets(sheets_client, results)
-
         print("\n" + "="*60)
         print("Client Information Scraper completed!")
         print("="*60)
 
-        return results
+        # Return as dict keyed by ClientID for easy joining
+        return results_to_dict(results)
 
     except Exception as e:
         print(f"Error in scraper execution: {e}")

@@ -1032,9 +1032,18 @@ def attendance_frame(treatment_thread, client_summary):
     return [output_headers] + ranked_rows
 
 
-def resident_info_frame(treatment_thread):
-    """Build resident info frame by pivoting /Resident Information Capture data to wide format."""
+def resident_info_frame(treatment_thread, client_info_map=None):
+    """Build resident info frame by pivoting /Resident Information Capture data to wide format.
+
+    Args:
+        treatment_thread: List of lists with treatment thread data
+        client_info_map: Optional dict of ClientID -> {FirstName, LastName, DOB, Nickname, PhoneNumber, Email}
+                        from scraping. If provided, joins this info with resident data.
+    """
     print("Building resident info frame...")
+
+    if client_info_map is None:
+        client_info_map = {}
 
     # Define the codes we want as columns
     target_codes = [
@@ -1042,6 +1051,9 @@ def resident_info_frame(treatment_thread):
         'moved-into-other-housing', 'moveout-date', 'moveout-reason',
         'reason-entering', 'referring-agency', 'therapist-status'
     ]
+
+    # Contact info fields from scraping
+    contact_fields = ['FirstName', 'LastName', 'DOB', 'Nickname', 'PhoneNumber', 'Email']
 
     tt_headers = treatment_thread[0]
     tt_col = get_column_indices(tt_headers)
@@ -1078,7 +1090,7 @@ def resident_info_frame(treatment_thread):
         })
 
     # For each client, pick the most recent record and pivot to wide
-    output_headers = ['ClientID'] + target_codes
+    output_headers = ['ClientID'] + contact_fields + target_codes
     output_rows = []
 
     for client_id, records in client_records.items():
@@ -1092,8 +1104,13 @@ def resident_info_frame(treatment_thread):
             if code not in code_values:  # Take first (most recent) occurrence
                 code_values[code] = rec['value']
 
-        # Build output row
+        # Get contact info from scraped data (if available)
+        contact_info = client_info_map.get(client_id, {})
+
+        # Build output row: ClientID + contact fields + target codes
         row = [client_id]
+        for field in contact_fields:
+            row.append(contact_info.get(field, ''))
         for code in target_codes:
             row.append(code_values.get(code, ''))
 
@@ -1159,14 +1176,14 @@ def main():
     # Build attendance frame
     attendance = attendance_frame(treatment_thread, daily_summary)
 
-    # Build resident info frame
-    resident_info = resident_info_frame(treatment_thread)
-
     # Scrape client contact info from ReliaTrax
     print("\n" + "="*60)
     print("Scraping client contact information...")
     print("="*60)
-    scrape_all_clients(treatment_thread)
+    client_info_map = scrape_all_clients(treatment_thread)
+
+    # Build resident info frame (joined with scraped contact info)
+    resident_info = resident_info_frame(treatment_thread, client_info_map)
 
     # Write output sheets
     print("\n" + "="*60)
