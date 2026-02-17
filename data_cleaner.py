@@ -104,9 +104,13 @@ def write_sheet_data(client, sheet_id, worksheet_name, data):
         # Create worksheet if it doesn't exist
         worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=len(data), cols=len(data[0]))
 
+    # Test user IDs to exclude from all exports
+    EXCLUDED_IDS = {'1003383'}
+
     # Identify which columns contain dates and which are ID columns (by checking headers)
     date_columns = set()
     id_columns = set()
+    id_column_for_filter = None
     if len(data) > 1:
         headers = data[0]
         first_row = data[1]
@@ -117,6 +121,16 @@ def write_sheet_data(client, sheet_id, worksheet_name, data):
         for col_idx, header in enumerate(headers):
             if header in ['PatientID', 'ClientID']:
                 id_columns.add(col_idx)
+                if id_column_for_filter is None:
+                    id_column_for_filter = col_idx
+
+    # Filter out excluded IDs
+    if id_column_for_filter is not None:
+        filtered_data = [data[0]]  # Keep header
+        for row in data[1:]:
+            if str(row[id_column_for_filter]) not in EXCLUDED_IDS:
+                filtered_data.append(row)
+        data = filtered_data
 
     # Convert data for upload
     cleaned_data = []
