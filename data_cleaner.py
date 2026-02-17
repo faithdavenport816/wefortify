@@ -1064,7 +1064,7 @@ def compute_years_resided(start_date, end_date):
 
     # Generate sequence of years
     years = list(range(fy_start, fy_end + 1))
-    return ','.join(str(y) for y in years)
+    return ', '.join(str(y) for y in years)
 
 
 def resident_info_frame(treatment_thread, client_info_map=None):
