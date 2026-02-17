@@ -104,20 +104,25 @@ def write_sheet_data(client, sheet_id, worksheet_name, data):
         # Create worksheet if it doesn't exist
         worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=len(data), cols=len(data[0]))
 
-    # Identify which columns contain dates (by checking first data row)
+    # Identify which columns contain dates and which are ID columns (by checking headers)
     date_columns = set()
+    id_columns = set()
     if len(data) > 1:
         headers = data[0]
         first_row = data[1]
         for col_idx, cell in enumerate(first_row):
             if isinstance(cell, datetime):
                 date_columns.add(col_idx)
+        # Identify ID columns by header name
+        for col_idx, header in enumerate(headers):
+            if header in ['PatientID', 'ClientID']:
+                id_columns.add(col_idx)
 
     # Convert data for upload
     cleaned_data = []
-    for row in data:
+    for row_idx, row in enumerate(data):
         cleaned_row = []
-        for cell in row:
+        for col_idx, cell in enumerate(row):
             if isinstance(cell, datetime):
                 # Format datetime as DATE ONLY (no time)
                 cleaned_row.append(cell.strftime('%m/%d/%Y'))
@@ -125,6 +130,9 @@ def write_sheet_data(client, sheet_id, worksheet_name, data):
                 cleaned_row.append(1)
             elif cell is False:
                 cleaned_row.append(0)
+            elif row_idx > 0 and col_idx in id_columns and cell:
+                # Prefix ID columns with ' to force plain text in Google Sheets
+                cleaned_row.append(f"'{cell}")
             else:
                 cleaned_row.append(cell)
         cleaned_data.append(cleaned_row)
