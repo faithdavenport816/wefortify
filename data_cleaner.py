@@ -1110,7 +1110,7 @@ def resident_info_frame(treatment_thread, client_info_map=None):
     ]
 
     # Contact info fields from scraping
-    contact_fields = ['FirstName', 'LastName', 'DOB', 'Nickname', 'PhoneNumber', 'Email', 'AssignedOffice']
+    contact_fields = ['FirstName', 'LastName', 'DOB', 'Nickname', 'PhoneNumber', 'Email']
 
     tt_headers = treatment_thread[0]
     tt_col = get_column_indices(tt_headers)
@@ -1147,7 +1147,7 @@ def resident_info_frame(treatment_thread, client_info_map=None):
         })
 
     # For each client, pick the most recent record and pivot to wide
-    output_headers = ['ClientID'] + contact_fields + ['is_active_resident'] + target_codes + ['move_out_year', 'years_resided']
+    output_headers = ['ClientID'] + contact_fields + ['is_active_resident'] + target_codes + ['move_out_year', 'years_resided', 'AssignedOffice']
     output_rows = []
 
     for client_id, records in client_records.items():
@@ -1205,6 +1205,7 @@ def resident_info_frame(treatment_thread, client_info_map=None):
             row.append(code_values.get(code, ''))
         row.append(move_out_year)
         row.append(years_resided)
+        row.append(contact_info.get('AssignedOffice', ''))
 
         output_rows.append(row)
 
