@@ -1032,6 +1032,41 @@ def attendance_frame(treatment_thread, client_summary):
     return [output_headers] + ranked_rows
 
 
+def compute_fiscal_year(date_obj):
+    """Compute fiscal year for a date. FY runs Oct 1 - Sep 30.
+    If date < Oct 1, fiscal year = that year. Otherwise fiscal year = year + 1.
+    """
+    if date_obj is None:
+        return None
+    if date_obj.month < 10:
+        return date_obj.year
+    else:
+        return date_obj.year + 1
+
+
+def compute_years_resided(start_date, end_date):
+    """Compute comma-separated list of fiscal years from start to end date.
+    If end_date is None, uses current fiscal year + 1 as default end.
+    """
+    if start_date is None:
+        return ''
+
+    fy_start = compute_fiscal_year(start_date)
+
+    if end_date is None:
+        # Default to current year + 1 (matching the Google Sheets formula)
+        fy_end = datetime.now().year + 1
+    else:
+        fy_end = compute_fiscal_year(end_date)
+
+    if fy_start is None:
+        return ''
+
+    # Generate sequence of years
+    years = list(range(fy_start, fy_end + 1))
+    return ','.join(str(y) for y in years)
+
+
 def resident_info_frame(treatment_thread, client_info_map=None):
     """Build resident info frame by pivoting /Resident Information Capture data to wide format.
 
@@ -1090,7 +1125,7 @@ def resident_info_frame(treatment_thread, client_info_map=None):
         })
 
     # For each client, pick the most recent record and pivot to wide
-    output_headers = ['ClientID'] + contact_fields + ['is_active_resident'] + target_codes
+    output_headers = ['ClientID'] + contact_fields + ['is_active_resident'] + target_codes + ['move_out_year', 'years_resided']
     output_rows = []
 
     for client_id, records in client_records.items():
@@ -1109,16 +1144,45 @@ def resident_info_frame(treatment_thread, client_info_map=None):
 
         # Determine if active resident (inactive if moveout-reason OR moveout-date has a value)
         moveout_reason = code_values.get('moveout-reason', '')
-        moveout_date = code_values.get('moveout-date', '')
-        is_active_resident = 'No' if (moveout_reason or moveout_date) else 'Yes'
+        moveout_date_str = code_values.get('moveout-date', '')
+        is_active_resident = 'No' if (moveout_reason or moveout_date_str) else 'Yes'
 
-        # Build output row: ClientID + contact fields + is_active_resident + target codes
+        # Parse dates for fiscal year calculations
+        lease_signed_str = code_values.get('lease-signed-date', '')
+        lease_signed_date = None
+        moveout_date = None
+
+        if lease_signed_str:
+            try:
+                lease_signed_date = parse_date_flexible(lease_signed_str)
+            except:
+                pass
+
+        if moveout_date_str:
+            try:
+                moveout_date = parse_date_flexible(moveout_date_str)
+            except:
+                pass
+
+        # Compute move_out_year (fiscal year of moveout date)
+        move_out_year = ''
+        if moveout_date:
+            fy = compute_fiscal_year(moveout_date)
+            if fy:
+                move_out_year = str(fy)
+
+        # Compute years_resided (comma-separated fiscal years from lease-signed to moveout/current)
+        years_resided = compute_years_resided(lease_signed_date, moveout_date)
+
+        # Build output row: ClientID + contact fields + is_active_resident + target codes + new columns
         row = [client_id]
         for field in contact_fields:
             row.append(contact_info.get(field, ''))
         row.append(is_active_resident)
         for code in target_codes:
             row.append(code_values.get(code, ''))
+        row.append(move_out_year)
+        row.append(years_resided)
 
         output_rows.append(row)
 
