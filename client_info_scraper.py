@@ -69,7 +69,8 @@ def scrape_client_info(driver, client_id):
             'DOB': '',
             'Nickname': '',
             'PhoneNumber': '',
-            'Email': ''
+            'Email': '',
+            'AssignedOffice': ''
         }
 
         # Wait for the Client fieldset to load
@@ -142,7 +143,19 @@ def scrape_client_info(driver, client_id):
         except Exception as e:
             print(f"    Warning: Could not find email: {e}")
 
-        print(f"    Scraped: {result['FirstName']} {result['LastName']} | {result['PhoneNumber']} | {result['Email']}")
+        # Extract Assigned Office
+        # HTML: Assigned Office: <strong>Working Fusion</strong>
+        try:
+            office_match = re.search(
+                r'Assigned Office:\s*<strong>([^<]+)</strong>',
+                page_source
+            )
+            if office_match:
+                result['AssignedOffice'] = office_match.group(1).strip()
+        except Exception as e:
+            print(f"    Warning: Could not find Assigned Office: {e}")
+
+        print(f"    Scraped: {result['FirstName']} {result['LastName']} | {result['PhoneNumber']} | {result['Email']} | {result['AssignedOffice']}")
         return result
 
     except Exception as e:
@@ -155,6 +168,7 @@ def scrape_client_info(driver, client_id):
             'Nickname': '',
             'PhoneNumber': '',
             'Email': '',
+            'AssignedOffice': '',
             'Error': str(e)
         }
 
@@ -171,7 +185,8 @@ def results_to_dict(results):
                 'DOB': result.get('DOB', ''),
                 'Nickname': result.get('Nickname', ''),
                 'PhoneNumber': result.get('PhoneNumber', ''),
-                'Email': result.get('Email', '')
+                'Email': result.get('Email', ''),
+                'AssignedOffice': result.get('AssignedOffice', '')
             }
     return client_info_map
 

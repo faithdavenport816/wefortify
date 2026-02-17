@@ -1110,7 +1110,7 @@ def resident_info_frame(treatment_thread, client_info_map=None):
     ]
 
     # Contact info fields from scraping
-    contact_fields = ['FirstName', 'LastName', 'DOB', 'Nickname', 'PhoneNumber', 'Email']
+    contact_fields = ['FirstName', 'LastName', 'DOB', 'Nickname', 'PhoneNumber', 'Email', 'AssignedOffice']
 
     tt_headers = treatment_thread[0]
     tt_col = get_column_indices(tt_headers)
