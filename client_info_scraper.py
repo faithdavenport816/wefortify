@@ -144,10 +144,10 @@ def scrape_client_info(driver, client_id):
             print(f"    Warning: Could not find email: {e}")
 
         # Extract Assigned Office
-        # HTML: Assigned Office: <strong>Working Fusion</strong>
+        # HTML: <span>Assigned Office:</span>\n<strong>Working Fusion</strong>
         try:
             office_match = re.search(
-                r'Assigned Office:\s*<strong>([^<]+)</strong>',
+                r'<span>Assigned Office:</span>\s*<strong>([^<]+)</strong>',
                 page_source
             )
             if office_match:
