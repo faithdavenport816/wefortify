@@ -522,6 +522,59 @@ def add_ra_compliant_metric(reporting_df, attendance_df):
     return reporting_df
 
 
+def build_navigator_summary(reporting_df):
+    """Aggregate metrics to one row per (Navigator, NavigatorCode, reporting_week_start).
+
+    Ratio metrics: count(Yes) / count(Yes, No, No Data Provided).
+    N/A and null are excluded from both numerator and denominator.
+    """
+    RATIO_COLS = [
+        "rent_this_month", "rent_this_month_on_time",
+        "rent_last_month", "rent_last_month_on_time",
+        "pursuing_DL", "has_budget", "has_checking_account",
+        "pursuing_GED", "employed", "employed_living_wage",
+        "one_on_one_compliant", "ra_compliant",
+    ]
+    VALID_VALUES = {"Yes", "No", "No Data Provided"}
+
+    group_keys = ["Navigator", "NavigatorCode", "reporting_week_start"]
+    grouped = reporting_df.groupby(group_keys)
+
+    rows = []
+    for key, group in grouped:
+        row = dict(zip(group_keys, key))
+
+        for col in RATIO_COLS:
+            valid = group[col][group[col].isin(VALID_VALUES)]
+            if len(valid) == 0:
+                row[col] = None
+            else:
+                row[col] = (valid == "Yes").sum() / len(valid)
+
+        row["edu_status"] = "N/A"
+        row["empowerment_plan"] = "N/A"
+
+        # avg_time_job_searching: average of numeric values, skip N/A and No Data Provided
+        vals = group["avg_time_job_searching"]
+        numeric_vals = []
+        for v in vals:
+            if v in ("N/A", "No Data Provided", None) or pd.isna(v):
+                continue
+            try:
+                numeric_vals.append(float(v))
+            except (ValueError, TypeError):
+                continue
+        row["avg_time_job_searching"] = (
+            sum(numeric_vals) / len(numeric_vals) if numeric_vals else None
+        )
+
+        rows.append(row)
+
+    summary_df = pd.DataFrame(rows)
+    print(f"  navigator_summary_df: {summary_df.shape}")
+    return summary_df
+
+
 def export_reporting_frame(reporting_df):
     """Export the reporting DataFrame to the Navigator Assignment Google Sheet."""
     client = get_sheets_client()
@@ -537,6 +590,18 @@ def export_reporting_frame(reporting_df):
     write_sheet_data(client, NAVIGATOR_ASSIGNMENT_SHEET_ID, "resident_metrics", data)
 
 
+def export_navigator_summary(navigator_summary_df):
+    """Export the navigator summary DataFrame to the Navigator Assignment Google Sheet."""
+    client = get_sheets_client()
+
+    export_df = navigator_summary_df.copy()
+    export_df["reporting_week_start"] = export_df["reporting_week_start"].dt.strftime("%m/%d/%Y")
+    export_df = export_df.fillna("")
+
+    data = [export_df.columns.tolist()] + export_df.values.tolist()
+    write_sheet_data(client, NAVIGATOR_ASSIGNMENT_SHEET_ID, "aggregated_metrics", data)
+
+
 if __name__ == "__main__":
     nav_assignment_df, treatment_thread_df, resident_info_df, rent_metrics_df, attendance_df = load_data()
     reporting_df = build_reporting_frame(nav_assignment_df, resident_info_df)
@@ -546,4 +611,6 @@ if __name__ == "__main__":
     reporting_df = add_empowerment_metric(reporting_df, treatment_thread_df)
     reporting_df = add_one_on_one_metric(reporting_df, attendance_df)
     reporting_df = add_ra_compliant_metric(reporting_df, attendance_df)
+    navigator_summary_df = build_navigator_summary(reporting_df)
     export_reporting_frame(reporting_df)
+    export_navigator_summary(navigator_summary_df)
