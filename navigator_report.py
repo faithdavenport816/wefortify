@@ -292,11 +292,12 @@ def add_life_skills_metrics(reporting_df, treatment_thread_df):
 def add_career_metrics(reporting_df, treatment_thread_df):
     """Add career metrics from Navigator Weekly Survey responses.
 
-    Appends four columns:
+    Appends five columns:
       - pursuing_GED          (N/A / Yes / No / No Data Provided)
       - edu_status            (raw value of enroll-education / No Data Provided)
       - employed              (Yes / No / No Data Provided)
       - employed_living_wage  (Yes / No / No Data Provided)
+      - avg_time_job_searching (raw value of hours-job-searching when unemployed / N/A / No Data Provided)
     """
     CAREER_CODES = {
         "highschool-degree",
@@ -334,6 +335,7 @@ def add_career_metrics(reporting_df, treatment_thread_df):
     edu_status_col = []
     employed_col = []
     employed_lw_col = []
+    avg_time_job_searching_col = []
 
     for _, row in reporting_df.iterrows():
         client_id = str(row["ClientID"])
@@ -342,6 +344,7 @@ def add_career_metrics(reporting_df, treatment_thread_df):
         hs = response_lookup.get((client_id, "highschool-degree", week))
         enroll = response_lookup.get((client_id, "enroll-education", week))
         emp = response_lookup.get((client_id, "employment-status-simple", week))
+        hours_js = response_lookup.get((client_id, "hours-job-searching", week))
 
         # --- pursuing_GED ---
         if hs is None:
@@ -377,10 +380,19 @@ def add_career_metrics(reporting_df, treatment_thread_df):
         else:
             employed_lw_col.append("No")
 
+        # --- avg_time_job_searching ---
+        if emp is not None and emp != "Unemployed":
+            avg_time_job_searching_col.append("N/A")
+        elif hours_js is not None:
+            avg_time_job_searching_col.append(hours_js)
+        else:
+            avg_time_job_searching_col.append("No Data Provided")
+
     reporting_df["pursuing_GED"] = pursuing_ged_col
     reporting_df["edu_status"] = edu_status_col
     reporting_df["employed"] = employed_col
     reporting_df["employed_living_wage"] = employed_lw_col
+    reporting_df["avg_time_job_searching"] = avg_time_job_searching_col
 
     print(f"  Added career metrics: {reporting_df.shape}")
     return reporting_df
