@@ -33,7 +33,7 @@ def load_data():
     rent_metrics_data = read_sheet_data(client, DATA_PROCESSING_SHEET, "rent_metrics_frame")
     rent_metrics_df = pd.DataFrame(rent_metrics_data[1:], columns=rent_metrics_data[0])
 
-    attendance_data = read_sheet_data(client, DATA_PROCESSING_SHEET, "attendance_frame")
+    attendance_data = read_sheet_data(client, DATA_PROCESSING_SHEET, "fake_attendance_frame")
     attendance_df = pd.DataFrame(attendance_data[1:], columns=attendance_data[0])
 
     print(f"\nLoaded all DataFrames:")
@@ -386,6 +386,96 @@ def add_career_metrics(reporting_df, treatment_thread_df):
     return reporting_df
 
 
+def add_empowerment_metric(reporting_df, treatment_thread_df):
+    """Add empowerment plan metric from Navigator Weekly Survey responses.
+
+    Appends one column:
+      - empowerment_plan  (raw value of progress-empowerment-plan / No Data Provided)
+    """
+    filtered = treatment_thread_df[
+        (treatment_thread_df["Document"] == "Navigator Weekly Survey")
+        & (treatment_thread_df["Code"] == "progress-empowerment-plan")
+    ].copy()
+
+    filtered["Date"] = pd.to_datetime(filtered["Date"], errors="coerce")
+    filtered = filtered.dropna(subset=["Date"])
+    filtered["response_week"] = filtered["Date"] - pd.to_timedelta(
+        filtered["Date"].dt.weekday, unit="D"
+    )
+
+    filtered = filtered.sort_values("Date")
+    filtered = filtered.drop_duplicates(
+        subset=["ClientID", "Code", "response_week"], keep="last"
+    )
+
+    response_lookup = {}
+    for _, r in filtered.iterrows():
+        key = (str(r["ClientID"]), r["response_week"])
+        response_lookup[key] = str(r["Value"]).strip()
+
+    empowerment_col = []
+    for _, row in reporting_df.iterrows():
+        val = response_lookup.get((str(row["ClientID"]), row["reporting_week_start"]))
+        empowerment_col.append(val if val is not None else "No Data Provided")
+
+    reporting_df["empowerment_plan"] = empowerment_col
+
+    print(f"  Added empowerment metric: {reporting_df.shape}")
+    return reporting_df
+
+
+def add_one_on_one_metric(reporting_df, attendance_df):
+    """Add one-on-one compliance metric based on attendance history.
+
+    Appends one column:
+      - one_on_one_compliant  (Yes / No / No Data Provided)
+
+    "Yes" if the resident has fewer than 2 ABSENCE values in their last 5
+    one-on-ones prior to the end of the reporting week. "No" if 2 or more
+    ABSENCE values. "No Data Provided" if no attendance records exist.
+    """
+    att = attendance_df.copy()
+    att = att[att["Code"] == "Individual Case Management"]
+    att["Date"] = pd.to_datetime(att["Date"], errors="coerce")
+    att = att.dropna(subset=["Date"])
+    att["attendee_status"] = att["attendee_status"].str.strip()
+    att = att.sort_values("Date")
+
+    # Group attendance records by ClientID for efficient lookup
+    att_by_client = {}
+    for _, r in att.iterrows():
+        client_id = str(r["ClientID"])
+        att_by_client.setdefault(client_id, []).append({
+            "date": r["Date"],
+            "status": r["attendee_status"],
+        })
+
+    compliant_col = []
+    for _, row in reporting_df.iterrows():
+        client_id = str(row["ClientID"])
+        week_end = row["reporting_week_start"] + pd.Timedelta(days=6)
+
+        records = att_by_client.get(client_id)
+        if not records:
+            compliant_col.append("No Data Provided")
+            continue
+
+        # Last 5 meetings on or before the end of this reporting week
+        prior = [r for r in records if r["date"] <= week_end]
+        if not prior:
+            compliant_col.append("No Data Provided")
+            continue
+
+        last_five = prior[-5:]
+        absences = sum(1 for r in last_five if r["status"] == "ABSENCE")
+        compliant_col.append("No" if absences >= 2 else "Yes")
+
+    reporting_df["one_on_one_compliant"] = compliant_col
+
+    print(f"  Added one-on-one metric: {reporting_df.shape}")
+    return reporting_df
+
+
 def export_reporting_frame(reporting_df):
     """Export the reporting DataFrame to the Navigator Assignment Google Sheet."""
     client = get_sheets_client()
@@ -407,4 +497,6 @@ if __name__ == "__main__":
     reporting_df = add_rent_metrics(reporting_df, rent_metrics_df)
     reporting_df = add_life_skills_metrics(reporting_df, treatment_thread_df)
     reporting_df = add_career_metrics(reporting_df, treatment_thread_df)
+    reporting_df = add_empowerment_metric(reporting_df, treatment_thread_df)
+    reporting_df = add_one_on_one_metric(reporting_df, attendance_df)
     export_reporting_frame(reporting_df)
