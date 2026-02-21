@@ -1,0 +1,26 @@
+name: Run Navigator Report
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Python dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run Navigator Report
+      env:
+        GOOGLE_SHEETS_CREDS: ${{ secrets.GOOGLE_SHEETS_CREDS }}
+      run: python navigator_report.py
