@@ -200,6 +200,95 @@ def add_rent_metrics(reporting_df, rent_metrics_df):
     return reporting_df
 
 
+def add_life_skills_metrics(reporting_df, treatment_thread_df):
+    """Add life-skills metrics from Navigator Weekly Survey responses.
+
+    Appends three columns:
+      - pursuing_DL          (N/A / Yes / No / No Data Provided)
+      - has_budget           (Yes / No / No Data Provided)
+      - has_checking_account (Yes / No / No Data Provided)
+
+    Responses are slotted into reporting weeks by their Date. If multiple
+    responses exist for the same client/code/week, the latest one wins.
+    """
+    LIFE_SKILLS_CODES = {
+        "drivers-license-detailed",
+        "budget-detailed",
+        "has-checking-account",
+    }
+
+    # Filter to Navigator Weekly Survey and the three codes
+    filtered = treatment_thread_df[
+        (treatment_thread_df["Document"] == "Navigator Weekly Survey")
+        & (treatment_thread_df["Code"].isin(LIFE_SKILLS_CODES))
+    ].copy()
+
+    # Parse Date and compute the Monday-starting reporting week
+    filtered["Date"] = pd.to_datetime(filtered["Date"], errors="coerce")
+    filtered = filtered.dropna(subset=["Date"])
+    # Monday of the week the response falls in
+    filtered["response_week"] = filtered["Date"] - pd.to_timedelta(
+        filtered["Date"].dt.weekday, unit="D"
+    )
+
+    # Keep only the latest response per (ClientID, Code, week)
+    filtered = filtered.sort_values("Date")
+    filtered = filtered.drop_duplicates(
+        subset=["ClientID", "Code", "response_week"], keep="last"
+    )
+
+    # Build lookup: (ClientID, Code, response_week) -> Value
+    response_lookup = {}
+    for _, r in filtered.iterrows():
+        key = (str(r["ClientID"]), r["Code"], r["response_week"])
+        response_lookup[key] = str(r["Value"]).strip()
+
+    pursuing_dl_col = []
+    has_budget_col = []
+    has_checking_col = []
+
+    for _, row in reporting_df.iterrows():
+        client_id = str(row["ClientID"])
+        week = row["reporting_week_start"]
+
+        # --- pursuing_DL ---
+        # Values: "Yes" / "No and is not pursuing a DL" / "No but is currently pursuing a DL"
+        val = response_lookup.get((client_id, "drivers-license-detailed", week))
+        if val is None:
+            pursuing_dl_col.append("No Data Provided")
+        elif val == "Yes":
+            pursuing_dl_col.append("N/A")
+        elif val == "No but is currently pursuing a DL":
+            pursuing_dl_col.append("Yes")
+        else:
+            pursuing_dl_col.append("No")
+
+        # --- has_budget ---
+        val = response_lookup.get((client_id, "budget-detailed", week))
+        if val is None:
+            has_budget_col.append("No Data Provided")
+        elif val == "Yes":
+            has_budget_col.append("Yes")
+        else:
+            has_budget_col.append("No")
+
+        # --- has_checking_account ---
+        val = response_lookup.get((client_id, "has-checking-account", week))
+        if val is None:
+            has_checking_col.append("No Data Provided")
+        elif val == "Yes":
+            has_checking_col.append("Yes")
+        else:
+            has_checking_col.append("No")
+
+    reporting_df["pursuing_DL"] = pursuing_dl_col
+    reporting_df["has_budget"] = has_budget_col
+    reporting_df["has_checking_account"] = has_checking_col
+
+    print(f"  Added life skills metrics: {reporting_df.shape}")
+    return reporting_df
+
+
 def export_reporting_frame(reporting_df):
     """Export the reporting DataFrame to the Navigator Assignment Google Sheet."""
     client = get_sheets_client()
@@ -219,4 +308,5 @@ if __name__ == "__main__":
     nav_assignment_df, treatment_thread_df, resident_info_df, rent_metrics_df, attendance_df = load_data()
     reporting_df = build_reporting_frame(nav_assignment_df, resident_info_df)
     reporting_df = add_rent_metrics(reporting_df, rent_metrics_df)
+    reporting_df = add_life_skills_metrics(reporting_df, treatment_thread_df)
     export_reporting_frame(reporting_df)
