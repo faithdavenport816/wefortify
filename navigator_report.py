@@ -5,7 +5,7 @@ Reads data from Google Sheets into DataFrames for analysis.
 from datetime import date
 
 import pandas as pd
-from data_cleaner import get_sheets_client, read_sheet_data
+from data_cleaner import get_sheets_client, read_sheet_data, write_sheet_data
 
 REPORTING_START = pd.Timestamp("2026-01-05")  # first Monday
 
@@ -105,10 +105,118 @@ def build_reporting_frame(nav_assignment_df, resident_info_df):
 
     reporting_df = pd.DataFrame(rows)
     print(f"  reporting_df:       {reporting_df.shape}")
-    print(reporting_df)
     return reporting_df
+
+
+def add_rent_metrics(reporting_df, rent_metrics_df):
+    """Add rent payment metrics to each reporting week row.
+
+    For each row, looks up rent data for the month the reporting week falls in
+    ("this month") and the prior month ("last month").  Produces four columns:
+      - rent_this_month          (Yes/No or null)
+      - rent_this_month_on_time  (Yes/No or null)
+      - rent_last_month          (Yes/No or null)
+      - rent_last_month_on_time  (Yes/No or null)
+
+    Caveat: if today is before the 6th and the lookup month equals the current
+    calendar month, the metric is set to null (not enough time to determine).
+    """
+    today = date.today()
+    current_month_key = f"{today.month:02d}/{today.year}"
+    before_sixth = today.day < 6
+
+    # Build a lookup: (ClientID, "MM/YYYY") -> {rent_paid, rent_paid_on_time}
+    rent_lookup = {}
+    for _, r in rent_metrics_df.iterrows():
+        key = (str(r["ClientID"]), str(r["Month"]))
+        rent_lookup[key] = {
+            "rent_paid": str(r["rent_paid"]).strip(),
+            "rent_paid_on_time": str(r["rent_paid_on_time"]).strip(),
+        }
+
+    this_month_col = []
+    this_month_ot_col = []
+    last_month_col = []
+    last_month_ot_col = []
+
+    for _, row in reporting_df.iterrows():
+        client_id = str(row["ClientID"])
+        week_start = row["reporting_week_start"]
+
+        # "this month" = the month the reporting week falls in
+        this_month_key = f"{week_start.month:02d}/{week_start.year}"
+
+        # "last month" = the calendar month before this_month
+        if week_start.month == 1:
+            last_month_key = f"12/{week_start.year - 1}"
+        else:
+            last_month_key = f"{week_start.month - 1:02d}/{week_start.year}"
+
+        # --- this month ---
+        if before_sixth and this_month_key == current_month_key:
+            this_month_col.append(None)
+            this_month_ot_col.append(None)
+        else:
+            info = rent_lookup.get((client_id, this_month_key))
+            if info:
+                paid = info["rent_paid"] == "Yes"
+                this_month_col.append("Yes" if paid else "No")
+                this_month_ot_col.append(
+                    "Yes" if paid and info["rent_paid_on_time"] == "Yes" else "No"
+                )
+            else:
+                this_month_col.append(None)
+                this_month_ot_col.append(None)
+
+        # --- last month ---
+        # Null if the resident moved in during the same month as the reporting week
+        move_in = row["moveInDate"]
+        moved_in_this_month = (
+            pd.notna(move_in)
+            and move_in.month == week_start.month
+            and move_in.year == week_start.year
+        )
+        if moved_in_this_month:
+            last_month_col.append(None)
+            last_month_ot_col.append(None)
+        else:
+            info = rent_lookup.get((client_id, last_month_key))
+            if info:
+                paid = info["rent_paid"] == "Yes"
+                last_month_col.append("Yes" if paid else "No")
+                last_month_ot_col.append(
+                    "Yes" if paid and info["rent_paid_on_time"] == "Yes" else "No"
+                )
+            else:
+                last_month_col.append(None)
+                last_month_ot_col.append(None)
+
+    reporting_df["rent_this_month"] = this_month_col
+    reporting_df["rent_this_month_on_time"] = this_month_ot_col
+    reporting_df["rent_last_month"] = last_month_col
+    reporting_df["rent_last_month_on_time"] = last_month_ot_col
+
+    print(f"  Added rent metrics: {reporting_df.shape}")
+    return reporting_df
+
+
+def export_reporting_frame(reporting_df):
+    """Export the reporting DataFrame to the Navigator Assignment Google Sheet."""
+    client = get_sheets_client()
+
+    # Convert DataFrame to list-of-lists with header row
+    # Replace NaT/NaN with empty string for clean export
+    export_df = reporting_df.copy()
+    export_df["reporting_week_start"] = export_df["reporting_week_start"].dt.strftime("%m/%d/%Y")
+    export_df["moveInDate"] = export_df["moveInDate"].dt.strftime("%m/%d/%Y")
+    export_df = export_df.fillna("")
+
+    data = [export_df.columns.tolist()] + export_df.values.tolist()
+    write_sheet_data(client, NAVIGATOR_ASSIGNMENT_SHEET_ID, "result", data)
 
 
 if __name__ == "__main__":
     nav_assignment_df, treatment_thread_df, resident_info_df, rent_metrics_df, attendance_df = load_data()
     reporting_df = build_reporting_frame(nav_assignment_df, resident_info_df)
+    reporting_df = add_rent_metrics(reporting_df, rent_metrics_df)
+    export_reporting_frame(reporting_df)
