@@ -402,10 +402,10 @@ def add_empowerment_metric(reporting_df, treatment_thread_df):
       No:  Overall Backwards Progress
       N/A: No Meeting, No history
     """
+
     YES_VALUES = {
-        "Mixed Progress",
         "Overall Forward Progress",
-        "Some Forward and Some Backwards",
+        "Mixed Progress, some Forward and some Backwards",
     }
     NO_VALUES = {"Overall Backwards Progress", "Stayed the Same"}
     NA_VALUES = {"No Meeting", "No history"}
