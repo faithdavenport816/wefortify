@@ -593,6 +593,39 @@ def build_navigator_summary(reporting_df):
 
         rows.append(row)
 
+    # TOTAL row per week: aggregate across unique residents (dedupe by ClientID)
+    for week, week_group in reporting_df.groupby("reporting_week_start"):
+        deduped = week_group.drop_duplicates(subset=["ClientID"])
+        row = {
+            "Navigator": "TOTAL",
+            "NavigatorCode": "TOTAL",
+            "reporting_week_start": week,
+        }
+
+        for col in RATIO_COLS:
+            valid = deduped[col][deduped[col].isin(VALID_VALUES)]
+            if len(valid) == 0:
+                row[col] = None
+            else:
+                row[col] = (valid == "Yes").sum() / len(valid)
+
+        row["edu_status"] = "N/A"
+
+        vals = deduped["avg_time_job_searching"]
+        numeric_vals = []
+        for v in vals:
+            if v in ("N/A", "No Data Provided", None) or pd.isna(v):
+                continue
+            try:
+                numeric_vals.append(float(v))
+            except (ValueError, TypeError):
+                continue
+        row["avg_time_job_searching"] = (
+            sum(numeric_vals) / len(numeric_vals) if numeric_vals else None
+        )
+
+        rows.append(row)
+
     summary_df = pd.DataFrame(rows)
     print(f"  navigator_summary_df: {summary_df.shape}")
     return summary_df
