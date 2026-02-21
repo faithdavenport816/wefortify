@@ -640,6 +640,7 @@ def export_reporting_frame(reporting_df):
     export_df = reporting_df.copy()
     export_df["reporting_week_start"] = export_df["reporting_week_start"].dt.strftime("%m/%d/%Y")
     export_df["moveInDate"] = export_df["moveInDate"].dt.strftime("%m/%d/%Y")
+    export_df["NavigatorCode"] = "'" + export_df["NavigatorCode"].astype(str)
     export_df = export_df.fillna("")
 
     data = [export_df.columns.tolist()] + export_df.values.tolist()
@@ -652,6 +653,7 @@ def export_navigator_summary(navigator_summary_df):
 
     export_df = navigator_summary_df.copy()
     export_df["reporting_week_start"] = export_df["reporting_week_start"].dt.strftime("%m/%d/%Y")
+    export_df["NavigatorCode"] = "'" + export_df["NavigatorCode"].astype(str)
     export_df = export_df.fillna("")
 
     data = [export_df.columns.tolist()] + export_df.values.tolist()
