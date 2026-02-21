@@ -289,6 +289,103 @@ def add_life_skills_metrics(reporting_df, treatment_thread_df):
     return reporting_df
 
 
+def add_career_metrics(reporting_df, treatment_thread_df):
+    """Add career metrics from Navigator Weekly Survey responses.
+
+    Appends four columns:
+      - pursuing_GED          (N/A / Yes / No / No Data Provided)
+      - edu_status            (raw value of enroll-education / No Data Provided)
+      - employed              (Yes / No / No Data Provided)
+      - employed_living_wage  (Yes / No / No Data Provided)
+    """
+    CAREER_CODES = {
+        "highschool-degree",
+        "enroll-education",
+        "employment-status-simple",
+        "hours-job-searching",
+    }
+
+    # Filter to Navigator Weekly Survey and the relevant codes
+    filtered = treatment_thread_df[
+        (treatment_thread_df["Document"] == "Navigator Weekly Survey")
+        & (treatment_thread_df["Code"].isin(CAREER_CODES))
+    ].copy()
+
+    # Parse Date and compute the Monday-starting reporting week
+    filtered["Date"] = pd.to_datetime(filtered["Date"], errors="coerce")
+    filtered = filtered.dropna(subset=["Date"])
+    filtered["response_week"] = filtered["Date"] - pd.to_timedelta(
+        filtered["Date"].dt.weekday, unit="D"
+    )
+
+    # Keep only the latest response per (ClientID, Code, week)
+    filtered = filtered.sort_values("Date")
+    filtered = filtered.drop_duplicates(
+        subset=["ClientID", "Code", "response_week"], keep="last"
+    )
+
+    # Build lookup: (ClientID, Code, response_week) -> Value
+    response_lookup = {}
+    for _, r in filtered.iterrows():
+        key = (str(r["ClientID"]), r["Code"], r["response_week"])
+        response_lookup[key] = str(r["Value"]).strip()
+
+    pursuing_ged_col = []
+    edu_status_col = []
+    employed_col = []
+    employed_lw_col = []
+
+    for _, row in reporting_df.iterrows():
+        client_id = str(row["ClientID"])
+        week = row["reporting_week_start"]
+
+        hs = response_lookup.get((client_id, "highschool-degree", week))
+        enroll = response_lookup.get((client_id, "enroll-education", week))
+        emp = response_lookup.get((client_id, "employment-status-simple", week))
+
+        # --- pursuing_GED ---
+        if hs is None:
+            pursuing_ged_col.append("No Data Provided")
+        elif hs == "Yes":
+            pursuing_ged_col.append("N/A")
+        elif enroll in ("High School Degree", "Pursuing GED"):
+            pursuing_ged_col.append("Yes")
+        else:
+            pursuing_ged_col.append("No")
+
+        # --- edu_status (raw value of enroll-education) ---
+        if enroll is None:
+            edu_status_col.append("No Data Provided")
+        else:
+            edu_status_col.append(enroll)
+
+        # --- employed ---
+        if emp is None:
+            employed_col.append("No Data Provided")
+        elif emp in ("Employed at a Living Wage", "Employed at below a Living Wage"):
+            employed_col.append("Yes")
+        elif emp == "Unemployed":
+            employed_col.append("No")
+        else:
+            employed_col.append("No Data Provided")
+
+        # --- employed_living_wage ---
+        if emp is None:
+            employed_lw_col.append("No Data Provided")
+        elif emp == "Employed at a Living Wage":
+            employed_lw_col.append("Yes")
+        else:
+            employed_lw_col.append("No")
+
+    reporting_df["pursuing_GED"] = pursuing_ged_col
+    reporting_df["edu_status"] = edu_status_col
+    reporting_df["employed"] = employed_col
+    reporting_df["employed_living_wage"] = employed_lw_col
+
+    print(f"  Added career metrics: {reporting_df.shape}")
+    return reporting_df
+
+
 def export_reporting_frame(reporting_df):
     """Export the reporting DataFrame to the Navigator Assignment Google Sheet."""
     client = get_sheets_client()
@@ -309,4 +406,5 @@ if __name__ == "__main__":
     reporting_df = build_reporting_frame(nav_assignment_df, resident_info_df)
     reporting_df = add_rent_metrics(reporting_df, rent_metrics_df)
     reporting_df = add_life_skills_metrics(reporting_df, treatment_thread_df)
+    reporting_df = add_career_metrics(reporting_df, treatment_thread_df)
     export_reporting_frame(reporting_df)
