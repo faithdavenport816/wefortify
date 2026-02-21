@@ -15,26 +15,24 @@ NAVIGATOR_ASSIGNMENT_SHEET_ID = "1Qiox1LKdLOrIFFdmL9Ee9qFbm818yvrlomaRZSwwVFo"
 DATA_PROCESSING_SHEET = "196rg3YfpssRLsdFig4yN9G3U9NrQFPEeROnr1oSNGCA"
 
 
+def _read_sheet_as_df(client, sheet_id, tab_name):
+    """Read a Google Sheet tab and return it as a DataFrame."""
+    data = read_sheet_data(client, sheet_id, tab_name)
+    return pd.DataFrame(data[1:], columns=data[0])
+
+
 def load_data():
     """Read all required tabs from Google Sheets into DataFrames."""
     client = get_sheets_client()
 
     # From Navigator sheet
-    nav_assignment_data = read_sheet_data(client, NAVIGATOR_ASSIGNMENT_SHEET_ID, "Navigator x Resident Assignment")
-    nav_assignment_df = pd.DataFrame(nav_assignment_data[1:], columns=nav_assignment_data[0])
-
-    treatment_thread_data = read_sheet_data(client, DATA_PROCESSING_SHEET, "fake_treatment_thread_export")
-    treatment_thread_df = pd.DataFrame(treatment_thread_data[1:], columns=treatment_thread_data[0])
+    nav_assignment_df = _read_sheet_as_df(client, NAVIGATOR_ASSIGNMENT_SHEET_ID, "Navigator x Resident Assignment")
+    treatment_thread_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "fake_treatment_thread_export")
 
     # From Export sheet
-    resident_info_data = read_sheet_data(client, DATA_PROCESSING_SHEET, "resident_info_frame")
-    resident_info_df = pd.DataFrame(resident_info_data[1:], columns=resident_info_data[0])
-
-    rent_metrics_data = read_sheet_data(client, DATA_PROCESSING_SHEET, "rent_metrics_frame")
-    rent_metrics_df = pd.DataFrame(rent_metrics_data[1:], columns=rent_metrics_data[0])
-
-    attendance_data = read_sheet_data(client, DATA_PROCESSING_SHEET, "fake_attendance_frame")
-    attendance_df = pd.DataFrame(attendance_data[1:], columns=attendance_data[0])
+    resident_info_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "resident_info_frame")
+    rent_metrics_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "rent_metrics_frame")
+    attendance_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "fake_attendance_frame")
 
     print(f"\nLoaded all DataFrames:")
     print(f"  nav_assignment_df:  {nav_assignment_df.shape}")
@@ -200,6 +198,37 @@ def add_rent_metrics(reporting_df, rent_metrics_df):
     return reporting_df
 
 
+def _build_survey_lookup(treatment_thread_df, codes):
+    """Build a lookup dict from Navigator Weekly Survey responses.
+
+    Filters to "Navigator Weekly Survey" rows matching the given codes,
+    parses dates, computes the Monday-based reporting week, deduplicates
+    (keeping the latest response per client/code/week), and returns a dict
+    mapping (ClientID, Code, response_week) -> Value.
+    """
+    filtered = treatment_thread_df[
+        (treatment_thread_df["Document"] == "Navigator Weekly Survey")
+        & (treatment_thread_df["Code"].isin(codes))
+    ].copy()
+
+    filtered["Date"] = pd.to_datetime(filtered["Date"], errors="coerce")
+    filtered = filtered.dropna(subset=["Date"])
+    filtered["response_week"] = filtered["Date"] - pd.to_timedelta(
+        filtered["Date"].dt.weekday, unit="D"
+    )
+
+    filtered = filtered.sort_values("Date")
+    filtered = filtered.drop_duplicates(
+        subset=["ClientID", "Code", "response_week"], keep="last"
+    )
+
+    lookup = {}
+    for _, r in filtered.iterrows():
+        key = (str(r["ClientID"]), r["Code"], r["response_week"])
+        lookup[key] = str(r["Value"]).strip()
+    return lookup
+
+
 def add_life_skills_metrics(reporting_df, treatment_thread_df):
     """Add life-skills metrics from Navigator Weekly Survey responses.
 
@@ -217,31 +246,7 @@ def add_life_skills_metrics(reporting_df, treatment_thread_df):
         "has-checking-account",
     }
 
-    # Filter to Navigator Weekly Survey and the three codes
-    filtered = treatment_thread_df[
-        (treatment_thread_df["Document"] == "Navigator Weekly Survey")
-        & (treatment_thread_df["Code"].isin(LIFE_SKILLS_CODES))
-    ].copy()
-
-    # Parse Date and compute the Monday-starting reporting week
-    filtered["Date"] = pd.to_datetime(filtered["Date"], errors="coerce")
-    filtered = filtered.dropna(subset=["Date"])
-    # Monday of the week the response falls in
-    filtered["response_week"] = filtered["Date"] - pd.to_timedelta(
-        filtered["Date"].dt.weekday, unit="D"
-    )
-
-    # Keep only the latest response per (ClientID, Code, week)
-    filtered = filtered.sort_values("Date")
-    filtered = filtered.drop_duplicates(
-        subset=["ClientID", "Code", "response_week"], keep="last"
-    )
-
-    # Build lookup: (ClientID, Code, response_week) -> Value
-    response_lookup = {}
-    for _, r in filtered.iterrows():
-        key = (str(r["ClientID"]), r["Code"], r["response_week"])
-        response_lookup[key] = str(r["Value"]).strip()
+    response_lookup = _build_survey_lookup(treatment_thread_df, LIFE_SKILLS_CODES)
 
     pursuing_dl_col = []
     has_budget_col = []
@@ -306,30 +311,7 @@ def add_career_metrics(reporting_df, treatment_thread_df):
         "hours-job-searching",
     }
 
-    # Filter to Navigator Weekly Survey and the relevant codes
-    filtered = treatment_thread_df[
-        (treatment_thread_df["Document"] == "Navigator Weekly Survey")
-        & (treatment_thread_df["Code"].isin(CAREER_CODES))
-    ].copy()
-
-    # Parse Date and compute the Monday-starting reporting week
-    filtered["Date"] = pd.to_datetime(filtered["Date"], errors="coerce")
-    filtered = filtered.dropna(subset=["Date"])
-    filtered["response_week"] = filtered["Date"] - pd.to_timedelta(
-        filtered["Date"].dt.weekday, unit="D"
-    )
-
-    # Keep only the latest response per (ClientID, Code, week)
-    filtered = filtered.sort_values("Date")
-    filtered = filtered.drop_duplicates(
-        subset=["ClientID", "Code", "response_week"], keep="last"
-    )
-
-    # Build lookup: (ClientID, Code, response_week) -> Value
-    response_lookup = {}
-    for _, r in filtered.iterrows():
-        key = (str(r["ClientID"]), r["Code"], r["response_week"])
-        response_lookup[key] = str(r["Value"]).strip()
+    response_lookup = _build_survey_lookup(treatment_thread_df, CAREER_CODES)
 
     pursuing_ged_col = []
     edu_status_col = []
@@ -404,30 +386,15 @@ def add_empowerment_metric(reporting_df, treatment_thread_df):
     Appends one column:
       - empowerment_plan  (raw value of progress-empowerment-plan / No Data Provided)
     """
-    filtered = treatment_thread_df[
-        (treatment_thread_df["Document"] == "Navigator Weekly Survey")
-        & (treatment_thread_df["Code"] == "progress-empowerment-plan")
-    ].copy()
-
-    filtered["Date"] = pd.to_datetime(filtered["Date"], errors="coerce")
-    filtered = filtered.dropna(subset=["Date"])
-    filtered["response_week"] = filtered["Date"] - pd.to_timedelta(
-        filtered["Date"].dt.weekday, unit="D"
+    response_lookup = _build_survey_lookup(
+        treatment_thread_df, {"progress-empowerment-plan"}
     )
-
-    filtered = filtered.sort_values("Date")
-    filtered = filtered.drop_duplicates(
-        subset=["ClientID", "Code", "response_week"], keep="last"
-    )
-
-    response_lookup = {}
-    for _, r in filtered.iterrows():
-        key = (str(r["ClientID"]), r["response_week"])
-        response_lookup[key] = str(r["Value"]).strip()
 
     empowerment_col = []
     for _, row in reporting_df.iterrows():
-        val = response_lookup.get((str(row["ClientID"]), row["reporting_week_start"]))
+        val = response_lookup.get(
+            (str(row["ClientID"]), "progress-empowerment-plan", row["reporting_week_start"])
+        )
         empowerment_col.append(val if val is not None else "No Data Provided")
 
     reporting_df["empowerment_plan"] = empowerment_col
