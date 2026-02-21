@@ -534,7 +534,7 @@ def export_reporting_frame(reporting_df):
     export_df = export_df.fillna("")
 
     data = [export_df.columns.tolist()] + export_df.values.tolist()
-    write_sheet_data(client, NAVIGATOR_ASSIGNMENT_SHEET_ID, "result", data)
+    write_sheet_data(client, NAVIGATOR_ASSIGNMENT_SHEET_ID, "resident_metrics", data)
 
 
 if __name__ == "__main__":
