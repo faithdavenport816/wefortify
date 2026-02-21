@@ -476,6 +476,71 @@ def add_one_on_one_metric(reporting_df, attendance_df):
     return reporting_df
 
 
+def add_ra_compliant_metric(reporting_df, attendance_df):
+    """Add Resident Association meeting compliance metric.
+
+    Appends one column:
+      - ra_compliant  (Yes / No)
+
+    For residents in the village 12+ months: "Yes" if they have attended
+    (ATTENDED or EXCUSED) at least 9 RA meetings in the 12 months prior to
+    the end of the reporting week.
+
+    For residents in the village < 12 months: "Yes" if the number of RA
+    meetings attended is no more than 2 fewer than their months in the village
+    (e.g. 8 months → need at least 6 meetings).
+    """
+    att = attendance_df.copy()
+    att = att[att["Code"] == "Resident Association Meeting"]
+    att["Date"] = pd.to_datetime(att["Date"], errors="coerce")
+    att = att.dropna(subset=["Date"])
+    att["attendee_status"] = att["attendee_status"].str.strip()
+    # Only count ATTENDED and EXCUSED
+    att = att[att["attendee_status"].isin(["ATTENDED", "EXCUSED"])]
+    att = att.sort_values("Date")
+
+    # Group by ClientID for efficient lookup
+    att_by_client = {}
+    for _, r in att.iterrows():
+        client_id = str(r["ClientID"])
+        att_by_client.setdefault(client_id, []).append(r["Date"])
+
+    ra_col = []
+    for _, row in reporting_df.iterrows():
+        client_id = str(row["ClientID"])
+        move_in = row["moveInDate"]
+        week_end = row["reporting_week_start"] + pd.Timedelta(days=6)
+
+        if pd.isna(move_in):
+            ra_col.append("No")
+            continue
+
+        dates = att_by_client.get(client_id, [])
+
+        # Months the resident has lived in the village as of the reporting week
+        months_in_village = (
+            (week_end.year - move_in.year) * 12 + (week_end.month - move_in.month)
+        )
+
+        if months_in_village < 3:
+            ra_col.append("N/A")
+        elif months_in_village >= 12:
+            # Count RA meetings in the 12 months prior to end of reporting week
+            twelve_months_ago = week_end - pd.DateOffset(months=12)
+            count = sum(1 for d in dates if twelve_months_ago <= d <= week_end)
+            ra_col.append("Yes" if count >= 9 else "No")
+        else:
+            # Count all RA meetings from move-in through end of reporting week
+            count = sum(1 for d in dates if move_in <= d <= week_end)
+            required = months_in_village - 2
+            ra_col.append("Yes" if count >= required else "No")
+
+    reporting_df["ra_compliant"] = ra_col
+
+    print(f"  Added RA compliant metric: {reporting_df.shape}")
+    return reporting_df
+
+
 def export_reporting_frame(reporting_df):
     """Export the reporting DataFrame to the Navigator Assignment Google Sheet."""
     client = get_sheets_client()
@@ -499,4 +564,5 @@ if __name__ == "__main__":
     reporting_df = add_career_metrics(reporting_df, treatment_thread_df)
     reporting_df = add_empowerment_metric(reporting_df, treatment_thread_df)
     reporting_df = add_one_on_one_metric(reporting_df, attendance_df)
+    reporting_df = add_ra_compliant_metric(reporting_df, attendance_df)
     export_reporting_frame(reporting_df)
