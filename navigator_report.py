@@ -115,8 +115,8 @@ def add_rent_metrics(reporting_df, rent_metrics_df):
     ("this month") and the prior month ("last month").  Produces four columns:
       - rent_this_month          (Yes/No or null)
       - rent_this_month_on_time  (Yes/No or null)
-      - rent_last_month          (Yes/No or null)
-      - rent_last_month_on_time  (Yes/No or null)
+      - rent_last_month          (Yes/No, N/A if not resident prior month, or null)
+      - rent_last_month_on_time  (Yes/No, N/A if not resident prior month, or null)
 
     Caveat: if today is before the 6th and the lookup month equals the current
     calendar month, the metric is set to null (not enough time to determine).
@@ -177,8 +177,8 @@ def add_rent_metrics(reporting_df, rent_metrics_df):
             and move_in.year == week_start.year
         )
         if moved_in_this_month:
-            last_month_col.append(None)
-            last_month_ot_col.append(None)
+            last_month_col.append("N/A")
+            last_month_ot_col.append("N/A")
         else:
             info = rent_lookup.get((client_id, last_month_key))
             if info:
