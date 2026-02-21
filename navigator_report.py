@@ -248,6 +248,7 @@ def add_life_skills_metrics(reporting_df, treatment_thread_df):
 
     response_lookup = _build_survey_lookup(treatment_thread_df, LIFE_SKILLS_CODES)
 
+    has_dl_col = []
     pursuing_dl_col = []
     has_budget_col = []
     has_checking_col = []
@@ -256,9 +257,17 @@ def add_life_skills_metrics(reporting_df, treatment_thread_df):
         client_id = str(row["ClientID"])
         week = row["reporting_week_start"]
 
+        # --- has_DL ---
+        val = response_lookup.get((client_id, "drivers-license-detailed", week))
+        if val is None:
+            has_dl_col.append("No Data Provided")
+        elif val == "Yes":
+            has_dl_col.append("Yes")
+        else:
+            has_dl_col.append("No")
+
         # --- pursuing_DL ---
         # Values: "Yes" / "No and is not pursuing a DL" / "No but is currently pursuing a DL"
-        val = response_lookup.get((client_id, "drivers-license-detailed", week))
         if val is None:
             pursuing_dl_col.append("No Data Provided")
         elif val == "Yes":
@@ -286,6 +295,7 @@ def add_life_skills_metrics(reporting_df, treatment_thread_df):
         else:
             has_checking_col.append("No")
 
+    reporting_df["has_DL"] = has_dl_col
     reporting_df["pursuing_DL"] = pursuing_dl_col
     reporting_df["has_budget"] = has_budget_col
     reporting_df["has_checking_account"] = has_checking_col
@@ -554,7 +564,7 @@ def build_navigator_summary(reporting_df):
     RATIO_COLS = [
         "rent_this_month", "rent_this_month_on_time",
         "rent_last_month", "rent_last_month_on_time",
-        "pursuing_DL", "has_budget", "has_checking_account",
+        "has_DL", "pursuing_DL", "has_budget", "has_checking_account",
         "pursuing_GED", "employed", "employed_living_wage",
         "one_on_one_compliant", "ra_compliant",
         "empowerment_plan",
