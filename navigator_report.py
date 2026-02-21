@@ -2,8 +2,12 @@
 Navigator report script.
 Reads data from Google Sheets into DataFrames for analysis.
 """
+from datetime import date
+
 import pandas as pd
 from data_cleaner import get_sheets_client, read_sheet_data
+
+REPORTING_START = pd.Timestamp("2026-01-05")  # first Monday
 
 
 # Sheet IDs
@@ -42,5 +46,69 @@ def load_data():
     return nav_assignment_df, treatment_thread_df, resident_info_df, rent_metrics_df, attendance_df
 
 
+def build_reporting_frame(nav_assignment_df, resident_info_df):
+    """Create one row per (ClientID, Navigator, reporting_week_start).
+
+    Expands navigator assignments into weekly reporting rows, bounded by
+    the navigator assignment period and the resident's moveout date (if any).
+    """
+    today = pd.Timestamp(date.today())
+
+    # Parse dates in nav_assignment_df
+    for col in ["moveInDate (for reference)", "NavigatorStartDate", "NavigatorEndDate"]:
+        nav_assignment_df[col] = pd.to_datetime(nav_assignment_df[col], errors="coerce")
+
+    # Parse moveout-date in resident_info_df and keep only what we need
+    resident_info_df = resident_info_df[["ClientID", "moveout-date"]].copy()
+    resident_info_df["moveout-date"] = pd.to_datetime(resident_info_df["moveout-date"], errors="coerce")
+
+    # Join to get moveout-date onto nav assignments
+    merged = nav_assignment_df.merge(resident_info_df, on="ClientID", how="left")
+
+    rows = []
+    for _, r in merged.iterrows():
+        nav_start = r["NavigatorStartDate"]
+        nav_end = r["NavigatorEndDate"]
+
+        # Skip rows without a valid navigator start date
+        if pd.isna(nav_start):
+            continue
+
+        # Reporting end = min(today, moveout-date) — ignore NaT moveout
+        reporting_end = today
+        if pd.notna(r["moveout-date"]):
+            reporting_end = min(today, r["moveout-date"])
+
+        # Also cap at navigator end date if present
+        if pd.notna(nav_end):
+            reporting_end = min(reporting_end, nav_end)
+
+        # Generate Monday-starting weeks from REPORTING_START through reporting_end
+        if reporting_end < REPORTING_START:
+            continue
+
+        weeks = pd.date_range(start=REPORTING_START, end=reporting_end, freq="W-MON")
+
+        # Only keep weeks that overlap with the navigator assignment period
+        weeks = [w for w in weeks if w >= nav_start]
+
+        for w in weeks:
+            rows.append({
+                "ClientID": r["ClientID"],
+                "FirstName": r["FirstName"],
+                "LastName": r["LastName"],
+                "moveInDate": r["moveInDate (for reference)"],
+                "Navigator": r["Navigator"],
+                "NavigatorCode": r["NavigatorCode"],
+                "reporting_week_start": w,
+            })
+
+    reporting_df = pd.DataFrame(rows)
+    print(f"  reporting_df:       {reporting_df.shape}")
+    print(reporting_df)
+    return reporting_df
+
+
 if __name__ == "__main__":
     nav_assignment_df, treatment_thread_df, resident_info_df, rent_metrics_df, attendance_df = load_data()
+    reporting_df = build_reporting_frame(nav_assignment_df, resident_info_df)
