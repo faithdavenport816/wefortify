@@ -497,6 +497,8 @@ def add_ra_compliant_metric(reporting_df, attendance_df):
     att["attendee_status"] = att["attendee_status"].str.strip()
     # Only count ATTENDED and EXCUSED
     att = att[att["attendee_status"].isin(["ATTENDED", "EXCUSED"])]
+    # Deduplicate so the same meeting date isn't counted twice
+    att = att.drop_duplicates(subset=["ClientID", "Date"])
     att = att.sort_values("Date")
 
     # Group by ClientID for efficient lookup
