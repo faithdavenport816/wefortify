@@ -384,8 +384,22 @@ def add_empowerment_metric(reporting_df, treatment_thread_df):
     """Add empowerment plan metric from Navigator Weekly Survey responses.
 
     Appends one column:
-      - empowerment_plan  (raw value of progress-empowerment-plan / No Data Provided)
+      - empowerment_plan  (Yes / No / N/A / No Data Provided)
+
+    Mapping from raw progress-empowerment-plan values:
+      Yes: Mixed Progress, Overall Forward Progress,
+           Some Forward and Some Backwards, Stayed the Same
+      No:  Overall Backwards Progress
+      N/A: No Meeting, No history
     """
+    YES_VALUES = {
+        "Mixed Progress",
+        "Overall Forward Progress",
+        "Some Forward and Some Backwards",
+    }
+    NO_VALUES = {"Overall Backwards Progress", "Stayed the Same"}
+    NA_VALUES = {"No Meeting", "No history"}
+
     response_lookup = _build_survey_lookup(
         treatment_thread_df, {"progress-empowerment-plan"}
     )
@@ -395,7 +409,16 @@ def add_empowerment_metric(reporting_df, treatment_thread_df):
         val = response_lookup.get(
             (str(row["ClientID"]), "progress-empowerment-plan", row["reporting_week_start"])
         )
-        empowerment_col.append(val if val is not None else "No Data Provided")
+        if val is None:
+            empowerment_col.append("No Data Provided")
+        elif val in YES_VALUES:
+            empowerment_col.append("Yes")
+        elif val in NO_VALUES:
+            empowerment_col.append("No")
+        elif val in NA_VALUES:
+            empowerment_col.append("N/A")
+        else:
+            empowerment_col.append("No Data Provided")
 
     reporting_df["empowerment_plan"] = empowerment_col
 
@@ -534,6 +557,7 @@ def build_navigator_summary(reporting_df):
         "pursuing_DL", "has_budget", "has_checking_account",
         "pursuing_GED", "employed", "employed_living_wage",
         "one_on_one_compliant", "ra_compliant",
+        "empowerment_plan",
     ]
     VALID_VALUES = {"Yes", "No", "No Data Provided"}
 
@@ -552,7 +576,6 @@ def build_navigator_summary(reporting_df):
                 row[col] = (valid == "Yes").sum() / len(valid)
 
         row["edu_status"] = "N/A"
-        row["empowerment_plan"] = "N/A"
 
         # avg_time_job_searching: average of numeric values, skip N/A and No Data Provided
         vals = group["avg_time_job_searching"]
