@@ -27,12 +27,12 @@ def load_data():
 
     # From Navigator sheet
     nav_assignment_df = _read_sheet_as_df(client, NAVIGATOR_ASSIGNMENT_SHEET_ID, "Navigator x Resident Assignment")
-    treatment_thread_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "fake_treatment_thread_export")
+    treatment_thread_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "treatment_thread_export")
 
     # From Export sheet
     resident_info_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "resident_info_frame")
     rent_metrics_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "rent_metrics_frame")
-    attendance_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "fake_attendance_frame")
+    attendance_df = _read_sheet_as_df(client, DATA_PROCESSING_SHEET, "attendance_frame")
 
     print(f"\nLoaded all DataFrames:")
     print(f"  nav_assignment_df:  {nav_assignment_df.shape}")
