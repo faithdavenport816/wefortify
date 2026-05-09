@@ -74,14 +74,12 @@ def login_to_reliatrax(driver, username, password):
         password_field.send_keys(password)
         print("Password entered successfully")
 
-        print("Submitting login form...")
-        driver.execute_script("document.querySelector('.login-form').submit()")
-        print("Login form submitted")
+        print("Looking for login button...")
+        login_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
+        login_button.click()
+        print("Login button clicked")
 
         time.sleep(3)
-        print(f"Post-login URL: {driver.current_url}")
-        cookies = driver.get_cookies()
-        print(f"Cookies after login: {[c['name'] for c in cookies]}")
         print("Login successful!")
 
     except TimeoutException as e:

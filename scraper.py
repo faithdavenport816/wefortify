@@ -25,11 +25,7 @@ def export_treatment_data(driver, start_date, end_date):
         wait = WebDriverWait(driver, 30)
 
         print("Waiting for export page to load...")
-        time.sleep(3)
-
-        print(f"Export page title: {driver.title}")
-        print(f"Export page URL: {driver.current_url}")
-        driver.save_screenshot("/tmp/export_page_loaded.png")
+        time.sleep(2)
 
         # Select "All Folders" from the dropdown
         print("Looking for folder dropdown...")
