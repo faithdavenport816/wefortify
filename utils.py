@@ -33,6 +33,10 @@ def setup_driver():
     driver = webdriver.Chrome(options=chrome_options)
     driver.set_page_load_timeout(30)
 
+    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+    })
+
     return driver
 
 
@@ -70,10 +74,9 @@ def login_to_reliatrax(driver, username, password):
         password_field.send_keys(password)
         print("Password entered successfully")
 
-        print("Looking for login button...")
-        login_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-        login_button.click()
-        print("Login button clicked")
+        print("Submitting login form...")
+        driver.execute_script("document.querySelector('.login-form').submit()")
+        print("Login form submitted")
 
         time.sleep(3)
         print(f"Post-login URL: {driver.current_url}")
