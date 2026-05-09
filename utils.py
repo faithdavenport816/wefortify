@@ -76,6 +76,9 @@ def login_to_reliatrax(driver, username, password):
         print("Login button clicked")
 
         time.sleep(3)
+        print(f"Post-login URL: {driver.current_url}")
+        cookies = driver.get_cookies()
+        print(f"Cookies after login: {[c['name'] for c in cookies]}")
         print("Login successful!")
 
     except TimeoutException as e:
