@@ -75,7 +75,11 @@ def login_to_reliatrax(driver, username, password):
         login_button.click()
         print("Login button clicked")
 
-        time.sleep(3)
+        # Wait for redirect away from the login page
+        wait.until(EC.url_changes("https://wefortify.reliatrax.net/Account.aspx/Login"))
+        time.sleep(2)
+        print(f"Post-login URL: {driver.current_url}")
+        print(f"Post-login title: {driver.title}")
         print("Login successful!")
 
     except TimeoutException as e:
