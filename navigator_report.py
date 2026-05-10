@@ -495,7 +495,7 @@ def add_ra_compliant_metric(reporting_df, attendance_df):
       - ra_compliant  (Yes / No)
 
     For residents in the village 12+ months: "Yes" if they have attended
-    (ATTENDED or EXCUSED) at least 9 RA meetings in the 12 months prior to
+    (ATTENDED or EXCUSED) at least 8 RA meetings in the 12 months prior to
     the end of the reporting week.
 
     For residents in the village < 12 months: "Yes" if the number of RA
@@ -542,7 +542,7 @@ def add_ra_compliant_metric(reporting_df, attendance_df):
             # Count RA meetings in the 12 months prior to end of reporting week
             twelve_months_ago = week_end - pd.DateOffset(months=12)
             count = sum(1 for d in dates if twelve_months_ago <= d <= week_end)
-            ra_col.append("Yes" if count >= 9 else "No")
+            ra_col.append("Yes" if count >= 8 else "No")
         else:
             # Count all RA meetings from move-in through end of reporting week
             count = sum(1 for d in dates if move_in <= d <= week_end)
