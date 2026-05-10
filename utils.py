@@ -149,10 +149,15 @@ def write_to_sheets(data, sheet_id, worksheet_name=None, clear_first=True):
         row_with_timestamp = row + [timestamp]
         rows_with_timestamp.append(row_with_timestamp)
 
-    # Add headers and all data in one batch
-    print(f"Writing headers and {len(rows_with_timestamp)} rows...")
+    # Write in chunks to avoid Google Sheets API 502 errors on large payloads
+    CHUNK_SIZE = 5000
     all_data = [headers] + rows_with_timestamp
-    sheet.update('A1', all_data)
+    print(f"Writing headers and {len(rows_with_timestamp)} rows in chunks of {CHUNK_SIZE}...")
+
+    for i in range(0, len(all_data), CHUNK_SIZE):
+        chunk = all_data[i:i + CHUNK_SIZE]
+        start_row = i + 1
+        sheet.update(f'A{start_row}', chunk)
 
     print(f"Successfully wrote {len(data['rows'])} rows to worksheet '{sheet.title}'!")
 
